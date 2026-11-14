@@ -1894,6 +1894,17 @@ requestAnimationFrame(frame);
 
 // Hooks for automated play-testing.
 window.__wpf = {
+  // Render one frame at a given size and hand it back as a JPEG data URL (used to make the launcher's poster).
+  shot(w, h) {
+    const pr = renderer.getPixelRatio();
+    renderer.setPixelRatio(1); composer.setPixelRatio(1);
+    renderer.setSize(w, h, false); composer.setSize(w, h);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+    updateCamera(0); composer.render();
+    const url = canvas.toDataURL('image/jpeg', 0.92);
+    renderer.setPixelRatio(pr); composer.setPixelRatio(pr); resize();
+    return url;
+  },
   active, seed, puzzle, fish, offshore, poke, bucket, pearls, roadHen, cloud9, stats, get mood() { return mood; }, setMood(v) { mood = v; },
   rainbow, dog, hens, cats, crate, stone, pot, found, openBarn, secret, inBarn, FAIRY_RINGS, PLATES,
   get toothy() { return toothy; },
