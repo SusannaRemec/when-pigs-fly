@@ -1,0 +1,19 @@
+{
+  "name": "when-pigs-fly",
+  "version": "1.0.0",
+  "description": "When Pigs Fly: a browser 3D improbability game and its launcher page",
+  "scripts": {
+    "start": "python3 -m http.server 4173",
+    "bake": "node tools/dump-layout.mjs && blender -b --python blender/world_bake.py",
+    "bake:critters": "blender -b --python blender/critters.py",
+    "bake:draft": "node tools/dump-layout.mjs && blender -b --python blender/world_bake.py -- --draft --no-save"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "private": true
+}

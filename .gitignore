@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+__pycache__/
+*.blend1
+# bake by-products; `npm run bake` and `npm run bake:critters` recreate them
+blender/renders/*_bake.png
+blender/renders/ground_albedo.png
+blender/renders/critters_*.png
+blender/renders/keyart_draft.png

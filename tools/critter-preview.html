@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Critter preview</title>
+<style>html, body { margin: 0; height: 100%; overflow: hidden; background: #a9d8ff; } canvas { display: block; width: 100%; height: 100%; }</style>
+<base href="../">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import { loadCritters, pose } from './src/critters.js';
+import { createPig } from './src/pig.js';
+
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xa9d8ff);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
+scene.add(new THREE.HemisphereLight(0xd6e8ff, 0xb3ad90, 1.3));
+const sun = new THREE.DirectionalLight(0xffe2bd, 2.5);
+sun.position.set(18, 14, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12 });
+scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: 0x8fc866, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const critters = await loadCritters();
+const pig = createPig(critters);
+pig.group.position.x = -5.4;
+scene.add(pig.group);
+const others = ['cow', 'dog', 'cat', 'hen'].map((n, i) => {
+  const c = critters.make(n);
+  c.group.position.x = [-2, 1.6, 4, 5.6][i];
+  scene.add(c.group);
+  return c;
+});
+// ?turn=1.57 shows flanks, ?cam=x,y,z moves the camera, ?t=5 freezes time
+const q = new URLSearchParams(location.search);
+const turn = parseFloat(q.get('turn') || '0.5');
+const cam = (q.get('cam') || '0,4.5,20').split(',').map(Number);
+const frozen = q.has('t') ? parseFloat(q.get('t')) : null;
+window.__preview = { pig, others };
+
+function frame(ms) {
+  const t = frozen ?? ms / 1000;
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  camera.position.set(...cam);
+  camera.lookAt(0, 1.2, 0);
+  const flying = t % 8 > 4;
+  pig.setWingScale(1);
+  pig.setGoldWings(q.has('gold'));
+  pig.setSoot(q.has('soot') ? 1 : 0);
+  pig.group.position.y = flying ? 1.6 : 0;
+  pig.group.rotation.y = turn;
+  pig.update(1 / 60, { speed: flying ? 0 : 6, airborne: flying, t });
+  others.forEach((c, i) => {
+    c.group.rotation.y = turn;
+    pose(c, t * 7 + i, 0.5, t);
+    if (c.head) c.head.rotation.y = Math.sin(t * 1.5 + i) * 0.4;
+  });
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
