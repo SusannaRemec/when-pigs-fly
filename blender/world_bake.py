@@ -36,7 +36,19 @@ def sstep(a, b, v):
 
 def raw_y(x, z):
     y = 1.3 * np.sin(x * 0.07) * np.cos(z * 0.06) + 0.7 * np.sin(x * 0.13 + 1.7) * np.sin(z * 0.11 + 0.5) + 1.3
-    return y + 11 * np.exp(-((x - P['hill']['x']) ** 2 + (z - P['hill']['z']) ** 2) / 169)
+    y = y + 11 * np.exp(-((x - P['hill']['x']) ** 2 + (z - P['hill']['z']) ** 2) / 169)
+    y = y + 4.5 * np.exp(-((x - P['stone']['x']) ** 2 + (z - P['stone']['z']) ** 2) / 81)
+    return y - P['pond']['depth'] * np.exp(-((x - P['pond']['x']) ** 2 + (z - P['pond']['z']) ** 2) / P['pond']['s'] ** 2)
+
+
+def offshore(x, z):
+    """How far out to sea a point is (<= 0 on land): headlands, the islet and its causeway."""
+    h, c = L['HEADLAND'], L['CAUSEWAY']
+    coast = IR + h['out'] * np.maximum(0, np.sin(h['n'] * np.arctan2(z, x) + h['phase'])) ** 1.5
+    dx, dz = c['bx'] - c['ax'], c['bz'] - c['az']
+    t = np.clip(((x - c['ax']) * dx + (z - c['az']) * dz) / (dx * dx + dz * dz), 0, 1)
+    return np.minimum(np.minimum(np.hypot(x, z) - coast, np.hypot(x - P['islet']['x'], z - P['islet']['z']) - P['islet']['r']),
+                      np.hypot(x - c['ax'] - dx * t, z - c['az'] - dz * t) - c['hw'])
 
 
 def gy_np(x, z):
@@ -44,8 +56,8 @@ def gy_np(x, z):
     for f in FLATS:
         t = 1 - sstep(f['r'], f['r'] * 1.7, np.hypot(x - f['x'], z - f['z']))
         y = y + (raw_y(f['x'], f['z']) - y) * t
-    r = np.hypot(x, z)
-    return y - np.where(r > IR, ((r - IR) / 10) ** 2 * 5, 0)
+    off = np.maximum(offshore(x, z), 0)
+    return y - (off / 10) ** 2 * 5
 
 
 def gy(x, z):
@@ -221,6 +233,8 @@ def meadow(x, z, path=1.9):
         return False
     if any(math.hypot(x - cx, z - cz) < cr for cx, cz, cr in CLEAR):
         return False
+    if math.hypot(x - P['pond']['x'], z - P['pond']['z']) < 5.6 or math.hypot(x - P['islet']['x'], z - P['islet']['z']) < 3.6:
+        return False
     if math.hypot(x - P['pit']['x'], z - P['pit']['z']) < 9.3 or math.hypot(x - P['snow']['x'], z - P['snow']['z']) < 6.4:
         return False
     return not near(x, z, L['HAY_SPOTS'], 2.7) and math.hypot(x, z) > 2.2 and gy(x, z) < 8.3
@@ -312,12 +326,14 @@ def rock(M, r, seed, sub=1, mossy=True):
 
 for b in L['BOULDERS']:
     rock(T(G(b['x'], b['z'], b['r'] * 0.25)) @ Rz(b['seed']) @ S(1, random.uniform(0.8, 1.15), 0.8), b['r'], b['seed'] % 89, sub=2)
-for x, z in scatter(150, lambda x, z: gy(x, z) > -0.3 and not built_on(x, z) and path_dist(x, z) > 1.2 and not in_field(x, z), rmax=87):
+for x, z in scatter(150, lambda x, z: gy(x, z) > -0.3 and not built_on(x, z) and path_dist(x, z) > 1.2 and not in_field(x, z), rmax=122):
     r = random.uniform(0.14, 0.42)
     rock(T(G(x, z, r * 0.15)) @ Rz(random.uniform(0, 6)) @ S(1, random.uniform(0.7, 1.2), 0.65), r, random.uniform(0, 90), sub=1, mossy=r > 0.3)
 for i in range(11):  # sea stacks, out past where a walking pig can reach
     a, r = i * 0.571 + random.uniform(-0.15, 0.15), random.uniform(93, 101)
     s = random.uniform(1.4, 3.2)
+    while gy(math.cos(a) * r, math.sin(a) * r) > -3.5:   # clear of the headlands and the islet
+        r += 3
     rock(T((math.cos(a) * r, math.sin(a) * r, -1.4)) @ Rz(a) @ S(1, 0.85, random.uniform(1.0, 1.6)), s, i * 5.3, sub=2)
 for i in range(4):  # cairn at the foot of the lightning rod
     a = i * 1.6 + 0.4
@@ -325,7 +341,7 @@ for i in range(4):  # cairn at the foot of the lightning rod
 
 # ---- grass tufts, patchy
 GR0, GR1 = C(0x4f9a42), C(0xa6de6c)
-tufts = scatter(600 if DRAFT else 2600, lambda x, z: meadow(x, z) and noise.noise(Vector((x * 0.07, z * 0.07, 3.3))) > -0.12)
+tufts = scatter(700 if DRAFT else 3000, lambda x, z: meadow(x, z) and noise.noise(Vector((x * 0.07, z * 0.07, 3.3))) > -0.12, rmax=120)
 for x, z in tufts:
     base = G(x, z, -0.03)
     s = random.uniform(0.7, 1.35)
@@ -381,7 +397,7 @@ for t in random.sample(L['TREES'], 26):
 # ---- reeds along the shore
 for i in range(20 if DRAFT else 64):
     a = random.uniform(0, math.tau)
-    lo, hi = 78.0, 96.0
+    lo, hi = 78.0, 106.0
     for _ in range(18):  # find the waterline
         mid = (lo + hi) / 2
         if gy(math.cos(a) * mid, math.sin(a) * mid) > -0.42:
@@ -794,6 +810,110 @@ if True:
         props.from_mesh(mesh)
     use(props)
 
+# ---- the pond: bridge on the pit path, lily pads, reeds, stepping stones
+po, br = P['pond'], L['BRIDGE']
+BRM = T(Vector((br['x'], -br['z'], 0))) @ Rz(math.atan2(-br['dz'], br['dx']))      # local x runs along the bridge
+deck = lambda sx: L['bridgeEnd'] - 0.12 + br['rise'] * (1 - (sx / br['half']) ** 2)
+pitch = lambda sx: Ry(-math.atan(-2 * br['rise'] * sx / br['half'] ** 2))
+nb = 28
+for i in range(nb):
+    sx = -br['half'] + (i + 0.5) * 2 * br['half'] / nb
+    box(BRM @ T((sx, 0, deck(sx) + 0.06)) @ pitch(sx) @ S(0.46, 2 * br['hw'] + 0.1, 0.1), tint(WOOD, 0.12), xc=(), var=0.08)
+xs = [-br['half'] + i * 2 * br['half'] / 14 for i in range(15)]
+for sy in (-1, 1):
+    for a, b in zip(xs, xs[1:]):
+        beam(BRM @ Vector((a, sy * (br['hw'] - 0.15), deck(a) - 0.1)), BRM @ Vector((b, sy * (br['hw'] - 0.15), deck(b) - 0.1)), 0.14, 0.26, WOOD_D)
+        beam(BRM @ Vector((a, sy * br['hw'], deck(a) + 1.05)), BRM @ Vector((b, sy * br['hw'], deck(b) + 1.05)), 0.1, 0.1, WOOD)
+    for a in xs[::2]:
+        post(BRM @ T((a, sy * br['hw'], deck(a) - 0.1)), 0.14, 1.25, WOOD_D)
+    for a in (-2.6, 2.6):
+        beam(BRM @ Vector((a, sy * (br['hw'] - 0.1), deck(a) - 0.15)), BRM @ Vector((a, sy * (br['hw'] - 0.1), -2.6)), 0.22, 0.22, BARK_D)
+for sx in (-br['half'], br['half']):          # a stone step at each end
+    box(BRM @ T((sx * 1.04, 0, deck(sx) - 0.2)) @ S(1.0, 2 * br['hw'] + 0.4, 0.5), STONE, c2=tint(STONE))
+PAD, PAD_L = C(0x3f9350), C(0x7cc45e)
+pads = 0
+while pads < 12:
+    a, r = random.uniform(0, math.tau), random.uniform(0.6, 3.5)
+    x, z = po['x'] + math.cos(a) * r, po['z'] + math.sin(a) * r
+    if abs((x - br['x']) * br['dz'] - (z - br['z']) * br['dx']) < br['hw'] + 0.9:
+        continue
+    pads += 1
+    rr = random.uniform(0.32, 0.6)
+    Mp = T(Vector((x, -z, L['WATER_Y'] + 0.04))) @ Rz(random.uniform(0, 6))
+    flat([(math.cos(t) * rr, math.sin(t) * rr) for t in np.linspace(0.35, math.tau - 0.35, 11)] + [(0.0, 0.0)], Mp, PAD, fn=lambda f, p: tint(PAD_L if random.random() < 0.5 else PAD, 0.05))
+    if pads % 3 == 0:
+        ico(Mp @ T((0, 0, 0.1)) @ S(1, 1, 0.7), 0.16, C(0xff9db5), c2=C(0xffffff), sub=1)
+        ico(Mp @ T((0, 0, 0.17)), 0.06, C(0xffd23f), sub=0)
+for i in range(16):
+    a = i / 16 * math.tau + random.uniform(-0.15, 0.15)
+    lo, hi = 2.0, 9.0
+    for _ in range(14):
+        mid = (lo + hi) / 2
+        if gy(po['x'] + math.cos(a) * mid, po['z'] + math.sin(a) * mid) < L['WATER_Y'] + 0.1:
+            lo = mid
+        else:
+            hi = mid
+    x, z = po['x'] + math.cos(a) * lo, po['z'] + math.sin(a) * lo
+    if abs((x - br['x']) * br['dz'] - (z - br['z']) * br['dx']) < br['hw'] + 1.2:
+        continue
+    if i % 2:
+        rock(T(G(x, z, 0.1)) @ Rz(a) @ S(1, 0.8, 0.6), random.uniform(0.3, 0.55), i * 2.9, sub=1)
+    else:
+        for k in range(random.randint(4, 7)):
+            base = G(x + random.uniform(-0.5, 0.5), z + random.uniform(-0.5, 0.5), -0.1)
+            h = random.uniform(0.9, 1.6)
+            lean = Vector((random.uniform(-0.2, 0.2), random.uniform(-0.2, 0.2), h))
+            beam(base, base + lean, 0.05, 0.02, C(0x5e9a48), c2=C(0x9fcf6a))
+            if k % 3 == 0:
+                beam(base + lean * 0.86, base + lean * 1.08, 0.09, 0.09, C(0x6b4423))
+
+# ---- the lighthouse on its islet, and the causeway out to it
+isl, cw = P['islet'], L['CAUSEWAY']
+M = T(G(isl['x'], isl['z'], -0.2))
+LW, LR = C(0xfbf6ec), C(0xd8382e)
+for i in range(11):
+    a = i / 11 * math.tau
+    rock(M @ T((math.cos(a) * 3.0, math.sin(a) * 3.0, 0.3)) @ Rz(a) @ S(0.9, 1.3, 0.8), random.uniform(0.7, 1.0), i * 3.3, sub=2, mossy=False)
+cyl(M, 2.75, 2.6, 1.0, STONE_D, c2=STONE, seg=20, cuts=(0.5,))
+TOWER_H = 12.0
+def bands(f, p, Mi=M.inverted()):
+    zz = sum((Mi @ v.co).z for v in f.verts) / len(f.verts)
+    return LR if int((zz - 0.9) / (TOWER_H / 5)) % 2 == 1 else LW
+cyl(M @ T((0, 0, 0.9)), 2.3, 1.45, TOWER_H, LW, fn=bands, seg=22, var=0.02, cuts=tuple((i + 0.5) / 30 for i in range(30)))
+cyl(M @ T((0, 0, 12.8)), 2.2, 2.3, 0.3, IRON, seg=22, cuts=())
+for i in range(12):
+    a = i / 12 * math.tau
+    post(M @ T((math.cos(a) * 2.15, math.sin(a) * 2.15, 13.0)), 0.07, 0.9, IRON)
+cyl(M @ T((0, 0, 13.85)), 2.2, 2.2, 0.06, IRON, seg=22, cuts=())
+cyl(M @ T((0, 0, 13.0)), 1.2, 1.2, 1.9, C(0xfff2b8), seg=12, cuts=(), smooth=False, var=0)
+for i in range(6):
+    a = i / 6 * math.tau
+    post(M @ T((math.cos(a) * 1.22, math.sin(a) * 1.22, 13.0)), 0.1, 1.9, IRON)
+cyl(M @ T((0, 0, 14.9)), 1.6, 0.1, 1.5, LR, c2=tint(LR), seg=12, cuts=(0.5,))
+ico(M @ T((0, 0, 16.5)), 0.2, GOLD, sub=1)
+Md = M @ Rz(math.pi / 4)                      # door faces back along the causeway
+box(Md @ T((2.22, 0, 1.9)) @ S(0.3, 1.3, 2.3), LR)
+box(Md @ T((2.3, 0, 1.8)) @ S(0.3, 1.0, 2.0), WOOD_D)
+for (a, z) in ((0.9, 5.0), (-1.3, 8.0), (2.8, 10.5)):
+    r = 2.3 - (z - 0.9) * 0.071
+    Mw = M @ Rz(a) @ T((r - 0.05, 0, z))
+    box(Mw @ S(0.2, 0.8, 1.1), LR)
+    box(Mw @ T((0.03, 0, 0)) @ S(0.2, 0.55, 0.85), C(0x2a2430))
+LAMP_H = gy(isl['x'], isl['z']) - 0.2 + 13.95
+cdx, cdz = cw['bx'] - cw['ax'], cw['bz'] - cw['az']
+cl = math.hypot(cdx, cdz)
+for i in range(int(cl / 2.2)):
+    t = (i + 0.5) / int(cl / 2.2)
+    for sgn in (-1, 1):
+        x = cw['ax'] + cdx * t + sgn * (-cdz / cl) * (cw['hw'] + 0.3) + random.uniform(-0.3, 0.3)
+        z = cw['az'] + cdz * t + sgn * (cdx / cl) * (cw['hw'] + 0.3) + random.uniform(-0.3, 0.3)
+        if math.hypot(x - isl['x'], z - isl['z']) > 4.5:
+            rock(T(G(x, z, 0.1)) @ Rz(i) @ S(1, random.uniform(0.8, 1.2), 0.7), random.uniform(0.45, 0.8), i * 7.1 + sgn, sub=1, mossy=False)
+    if i % 3 == 1:
+        x, z = cw['ax'] + cdx * t - (-cdz / cl) * (cw['hw'] - 0.2), cw['az'] + cdz * t - (cdx / cl) * (cw['hw'] - 0.2)
+        post(T(G(x, z, -0.2)) @ Rz(0.3), 0.18, 1.5, WOOD_D)
+        ico(T(G(x, z, 1.35)), 0.14, LR, sub=1)
+
 # ---- pearls before swine: an open oyster on the north beach
 pe = L['SPOTS']['pearls']
 M = T(G(pe['x'], pe['z'], 0)) @ Rz(0.6)
@@ -892,6 +1012,17 @@ for i, d in enumerate(L['DUCKS']):
         ico(M @ T((sgn * 0.2, -0.72, 1.04)), 0.06, C(0x1c1c22), sub=1)
         ico(M @ T((sgn * 0.5, 0.05, 0.42)) @ S(0.3, 1, 0.6), 0.36, YEL_D, sub=2, smooth=True, var=0.01)
     loose_ob('duck_%d' % i, Vector((d['x'], -d['z'], L['WATER_Y'])))
+
+# the big fish in the small pond; it waits underwater until the game makes it jump
+use(bmesh.new())
+KOI, KOI_W = C(0xf0792a), C(0xfff4e6)
+ico(S(0.3, 0.75, 0.36), 1.0, KOI, sub=3, smooth=True, var=0, fn=lambda f, p: KOI_W if noise.noise(p.co * 2.3 + Vector((3, 1, 7))) > 0.12 else KOI)
+flat([(0, 0), (0.5, 0.5), (0.34, 0), (0.5, -0.5)], T((0, 0.62, 0)) @ Rz(math.pi / 2) @ Rx(math.pi / 2), KOI, var=0)
+flat([(-0.25, 0), (0.25, 0.32), (0.22, 0)], T((0, 0, 0.3)) @ Rz(math.pi / 2) @ Rx(math.pi / 2), KOI, var=0)
+for sgn in (-1, 1):
+    ico(T((sgn * 0.2, -0.5, 0.08)), 0.075, C(0xffffff), sub=1)
+    ico(T((sgn * 0.24, -0.53, 0.08)), 0.04, C(0x101014), sub=0)
+loose_ob('fish', Vector((po['x'], -po['z'], L['WATER_Y'] - 1.0)), shadow=False)
 
 # cloud nine
 use(bmesh.new())
@@ -1102,7 +1233,7 @@ for s, name in ((1, 'door_n'), (-1, 'door_s')):
     door_obs.append(ob)
 
 # ================================================================== TERRAIN
-R = 104
+R = 132
 n = 2 * R + 1
 ax = np.arange(-R, R + 1, dtype=np.float64)
 GXv, GYv = np.meshgrid(ax, ax, indexing='ij')         # [i, j] -> blender x, y
@@ -1192,6 +1323,12 @@ for (cx, cz, r0, colr, amt) in ((P['coop']['x'], P['coop']['z'] + 1.5, 4.6, 0xc4
                                 *[(p['x'], p['z'], 1.7, 0xb7986a, 0.8) for p in L['PLATES']]):
     d = np.hypot(X - cx, Z - cz)
     img = lay(img, colr, sstep(r0, r0 * 0.6, d + (n3 - 0.5) * 1.3) * amt)
+d = np.hypot(X - P['pond']['x'], Z - P['pond']['z'])
+img = lay(img, 0x4f9a42, sstep(8.5, 5.0, d + (n3 - 0.5) * 1.5) * 0.6)                 # lush banks round the pond
+img = lay(img, 0x7a6a4a, sstep(-0.1, -0.5, Hh) * sstep(8, 6, d))                     # and a muddy bed
+img = lay(img, 0x4a5a48, sstep(-0.6, -1.6, Hh) * sstep(8, 6, d) * 0.8)
+d = np.hypot(X - isl['x'], Z - isl['z'])
+img = lay(img, 0x9c9790, sstep(4.6, 3.0, d + (n3 - 0.5) * 1.2) * 0.85)
 for fr in L['FAIRY_RINGS']:                                                          # lusher, darker grass inside the rings
     d = np.hypot(X - fr['x'], Z - fr['z'])
     img = lay(img, 0x3f8f4a, sstep(3.4, 2.4, d + (n3 - 0.5) * 0.8) * 0.75)

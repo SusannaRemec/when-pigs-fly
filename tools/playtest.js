@@ -55,7 +55,7 @@
   log.peg = w.state.feats.peg;
   // barn puzzle
   w.teleport(P.horse.x + 4, null, P.horse.z); run(0.3);
-  for (const sym of w.puzzle.code) { const p = w.PLATES.find((p) => p.sym === sym); w.teleport(p.x, null, p.z); run(0.3); w.teleport(p.x + 3, null, p.z + 3); run(0.2); }
+  for (const sym of w.puzzle.code) { const p = w.PLATES.find((p) => p.sym === sym); w.teleport(p.x, null, p.z); run(0.3); w.teleport(-10, null, 46); run(0.2); } // step well clear, so as not to tread on the next plate
   log.barnOpen = w.state.barnOpen;
   // walk in through the door
   w.teleport(P.barn.x + 9, null, P.barn.z); w.face(-Math.PI / 2); w.press('KeyW', true); run(2.2); w.press('KeyW', false);

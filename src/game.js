@@ -5,7 +5,7 @@ import { EffectComposer } from '../vendor/postprocessing/EffectComposer.js';
 import { RenderPass } from '../vendor/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from '../vendor/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../vendor/postprocessing/OutputPass.js';
-import { P, SUN_DIR, WATER_Y, groundY, standY, makeRnd, buildColliders, CLOVERS, FAIRY_RINGS, PLATES, CAT_STARTS, HEN_STARTS, COW_STARTS, TREES, SPOTS } from './layout.js';
+import { P, SUN_DIR, WATER_Y, groundY, standY, makeRnd, buildColliders, CLOVERS, FAIRY_RINGS, PLATES, CAT_STARTS, HEN_STARTS, COW_STARTS, TREES, SPOTS, HEADLAND, CAUSEWAY, BRIDGE, offshore } from './layout.js';
 import { loadCritters, pose } from './critters.js';
 import { createPig } from './pig.js';
 import { Sfx } from './audio.js';
@@ -84,7 +84,7 @@ if (active.length < 5) {
 active = Object.keys(FEATS).filter((k) => active.includes(k));
 const isActive = (k) => active.includes(k);
 $('feats').innerHTML = active.map((k) => `<li data-k="${k}">${FEATS[k]}</li>`).join('')
-  + '<li data-k="moon" class="locked">Once in a blue moon…</li><li class="secrets">Secrets found <small id="secretN">0/14</small></li>';
+  + '<li data-k="moon" class="locked">Once in a blue moon…</li><li class="secrets">Secrets found <small id="secretN">0/15</small></li>';
 // counters for jobs that are not on today's list still need somewhere to write
 for (const id of ['cloverN', 'cowN', 'catN']) if (!$(id)) { const e = document.createElement('i'); e.id = id; e.hidden = true; document.body.append(e); }
 
@@ -301,6 +301,12 @@ const waterMat = new THREE.ShaderMaterial({
     void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz; vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
       #include <fog_vertex>
     }`,
+  defines: {
+    POND: `vec2(${P.pond.x.toFixed(2)}, ${P.pond.z.toFixed(2)})`, POND_D: P.pond.depth.toFixed(2), POND_S: P.pond.s.toFixed(2),
+    ISLET: `vec3(${P.islet.x.toFixed(2)}, ${P.islet.z.toFixed(2)}, ${P.islet.r.toFixed(2)})`,
+    CW_A: `vec2(${CAUSEWAY.ax.toFixed(2)}, ${CAUSEWAY.az.toFixed(2)})`, CW_B: `vec2(${CAUSEWAY.bx.toFixed(2)}, ${CAUSEWAY.bz.toFixed(2)})`, CW_HW: CAUSEWAY.hw.toFixed(2),
+    HL_OUT: HEADLAND.out.toFixed(2), HL_N: HEADLAND.n.toFixed(2), HL_PHASE: HEADLAND.phase.toFixed(3),
+  },
   fragmentShader: `uniform float time; uniform float waterY; uniform vec3 tint; varying vec3 vW;
     #include <fog_pars_fragment>
     float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -310,7 +316,10 @@ const waterMat = new THREE.ShaderMaterial({
       float x = vW.x, z = vW.z, r = length(vW.xz);
       // the island's own height formula (layout.js), near enough at the coast
       float h = 1.3 * sin(x * 0.07) * cos(z * 0.06) + 0.7 * sin(x * 0.13 + 1.7) * sin(z * 0.11 + 0.5) + 1.3;
-      float e = max(r - 82.0, 0.0) / 10.0; h -= e * e * 5.0;
+      h -= POND_D * exp(-dot(vW.xz - POND, vW.xz - POND) / (POND_S * POND_S));
+      vec2 ab = CW_B - CW_A; float ct = clamp(dot(vW.xz - CW_A, ab) / dot(ab, ab), 0.0, 1.0);
+      float off = min(min(r - (82.0 + HL_OUT * pow(max(0.0, sin(HL_N * atan(z, x) + HL_PHASE)), 1.5)), distance(vW.xz, ISLET.xy) - ISLET.z), distance(vW.xz, CW_A + ab * ct) - CW_HW);
+      float e = max(off, 0.0) / 10.0; h -= e * e * 5.0;
       float depth = max(waterY - h, 0.0);
       float n = noise(vW.xz * 0.3 + time * 0.2);
       float deep = smoothstep(0.0, 11.0, depth + n * 2.0);
@@ -320,7 +329,7 @@ const waterMat = new THREE.ShaderMaterial({
       float lap = 0.35 * sin(time * 0.9 + n * 5.0);
       float foam = smoothstep(0.85, 0.0, depth + n * 0.5 - lap);
       foam += smoothstep(0.16, 0.0, abs(depth - 1.7 - 0.5 * sin(time * 0.6 + n * 6.0))) * 0.3 * n;
-      foam = clamp(foam, 0.0, 1.0);
+      foam = clamp(foam, 0.0, 1.0) * mix(0.18, 1.0, smoothstep(6.0, 12.0, distance(vW.xz, POND))); // the pond is still water
       c = mix(c, vec3(1.0), foam * 0.9);
       gl_FragColor = vec4(c * tint, max(mix(0.55, 0.96, deep), foam));
       #include <colorspace_fragment>
@@ -395,7 +404,7 @@ const pig = createPig(critters);
 scene.add(pig.group);
 const pos = new THREE.Vector3(0, groundY(0, 0), 0);
 let yaw = 0.5, speed = 0, vy = 0, grounded = true, flaps = 0, soot = 0;
-let wingScale = 0.22, autoFlapT = 0;
+let wingScale = 0.22, autoFlapT = 0, shoreX = 0, shoreZ = 0;
 pig.setWingScale(wingScale);
 
 // ---------------------------------------------------------------- game state
@@ -692,12 +701,12 @@ const holeBeacon = beacon('peg', 0xc9b8ff, hole.x, hole.z);
 const crateBeacon = beacon('peg', 0xe8c890, crate.x, crate.z);
 
 // ---------------------------------------------------------------- the barn door, and other secrets
-const SECRET_COUNT = 14;
+const SECRET_COUNT = 15;
 const HINTS = {
   elephant: 'whatever is in the barn', herring: 'something fishy on the west beach', worms: 'a can best left shut', ducks: 'a tidy row offshore',
   mill: 'a fight with a building', cheese: 'what the moon tastes of', cloud9: 'a pink cloud with a number on it', poke: 'a sack that oinks back',
   bucket: 'something to kick by the well', pearls: 'jewellery on the north beach', road: 'a hen with somewhere to be', field: 'standing about among the cabbages',
-  wash: 'a bath', tree: 'an argument with a tree, at speed',
+  wash: 'a bath', fish: 'who rules the pond', tree: 'an argument with a tree, at speed',
 };
 const found = {};
 let foundN = 0;
@@ -762,6 +771,25 @@ const poke = { ...SPOTS.poke, t: 0, hop: 0, g: world.poke };
 const bucket = { ...SPOTS.bucket, vx: 0, vz: 0, spin: 0, g: world.bucket, cool: 0 };
 // pearls before swine, on the north beach
 const pearls = SPOTS.pearls;
+// a big fish in a small pond, and the lighthouse lamp
+const fish = { g: world.fish, t: 0, side: 1 };
+const lamp = new THREE.Group();
+{
+  const y = groundY(P.islet.x, P.islet.z) + 13.75;
+  const bm = new THREE.MeshBasicMaterial({ color: 0xfff0c0, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
+  for (const s of [-1, 1]) {
+    const c = new THREE.Mesh(new THREE.ConeGeometry(7, 90, 20, 1, true), bm);
+    c.rotation.z = s * Math.PI / 2; // apex at the lamp, widening outward
+    c.position.x = -s * 45;
+    lamp.add(c);
+  }
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex([[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.5)'], [1, 'rgba(255,255,255,0)']]), color: 0xffe9a8, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, transparent: true }));
+  glow.scale.setScalar(6);
+  lamp.add(glow);
+  lamp.beam = bm; lamp.glow = glow;
+  lamp.position.set(P.islet.x, y, P.islet.z);
+  scene.add(lamp);
+}
 // why did the chicken cross the road
 const roadHen = { cr: critters.make('hen'), side: -1, x: -8.5, z: 9, phase: 0, moving: 0, crossed: 0 };
 scene.add(roadHen.cr.group);
@@ -1093,8 +1121,14 @@ function updatePig(dt) {
 
   // stay near the island
   const r = Math.hypot(pos.x, pos.z);
-  const maxR = grounded ? 89 : 185;
-  if (r > maxR) { pos.x *= maxR / r; pos.z *= maxR / r; }
+  if (r > 185) { pos.x *= 185 / r; pos.z *= 185 / r; }
+  if (grounded && offshore(pos.x, pos.z) > 7) { // wading has a limit: slide along it, or failing that drift home
+    if (offshore(pos.x, shoreZ) <= 7) pos.z = shoreZ;
+    else if (offshore(shoreX, pos.z) <= 7) pos.x = shoreX;
+    else if (offshore(shoreX, shoreZ) <= 7) { pos.x = shoreX; pos.z = shoreZ; }
+    else { pos.x *= 0.985; pos.z *= 0.985; }
+  }
+  shoreX = pos.x; shoreZ = pos.z;
 
   // obstacles
   for (const c of colliders) {
@@ -1688,6 +1722,22 @@ function updateFeats(dt) {
     else if (grounded && speed > 10.5 && dustT <= 0) { dustT = 0.11; burst(new THREE.Vector3(pos.x - Math.sin(yaw) * 1.1, pos.y + 0.15, pos.z - Math.cos(yaw) * 1.1), 0xe0d2ae, 1, 1.2, 1.5, 1.1); }
     if (wading) { if (!found.wash) soot = 0; secret('wash', 'Hogwash. You are now a slightly cleaner pig.'); }
   }
+  // the fish shows off whenever there is an audience
+  {
+    const d = hd(P.pond.x, P.pond.z);
+    fish.t += dt;
+    if (fish.t > 4.2 && d < 18) { fish.t = 0; fish.side = -fish.side; }
+    const k = fish.t / 0.95, px = BRIDGE.dz * 3.1 * fish.side, pz = -BRIDGE.dx * 3.1 * fish.side;
+    if (k < 1) {
+      const at = (q) => new THREE.Vector3(P.pond.x + px + BRIDGE.dx * (q - 0.5) * 3.4, WATER_Y - 0.3 + Math.sin(q * Math.PI) * 2.6, P.pond.z + pz + BRIDGE.dz * (q - 0.5) * 3.4);
+      fish.g.position.copy(at(k));
+      fish.g.lookAt(at(k + 0.05));
+      if ((k < 0.08 || k > 0.92) && Math.random() < 0.7) burst(new THREE.Vector3(fish.g.position.x, WATER_Y + 0.1, fish.g.position.z), 0xffffff, 2, 3, 9, 0.7);
+    } else fish.g.position.y = WATER_Y - 1.5;
+    if (d < 4.6 && nearGround()) secret('fish', 'A big fish in a small pond. It knows.');
+  }
+  lamp.rotation.y += dt * 0.55;
+  { const night = clamp((mood - 0.45) / 0.55, 0, 1); lamp.beam.opacity = 0.035 + night * 0.2; lamp.glow.material.opacity = 0.12 + night * 0.88; }
   if (pos.distanceTo(cloud9.position) < 8) secret('cloud9', 'You are on cloud nine. The view is smug.');
   if (hd(pearls.x, pearls.z) < 3) secret('pearls', 'Pearls before swine. You are unimpressed, as is traditional.');
   if (moonCow.cr) {
@@ -1844,7 +1894,7 @@ requestAnimationFrame(frame);
 
 // Hooks for automated play-testing.
 window.__wpf = {
-  active, seed, puzzle, poke, bucket, pearls, roadHen, cloud9, stats, get mood() { return mood; }, setMood(v) { mood = v; },
+  active, seed, puzzle, fish, offshore, poke, bucket, pearls, roadHen, cloud9, stats, get mood() { return mood; }, setMood(v) { mood = v; },
   rainbow, dog, hens, cats, crate, stone, pot, found, openBarn, secret, inBarn, FAIRY_RINGS, PLATES,
   get toothy() { return toothy; },
   get state() { return { x: pos.x, y: pos.y, z: pos.z, yaw, speed, vy, grounded, flaps, count, feats: { ...feats }, cloverCount, cowsHome, catsHome, hensCaught, foundN, barnOpen: puzzle.open, finale, ringIdx, won, time, started, ball: { x: ball.x, z: ball.z }, cows: cows.map((c) => ({ x: c.x, z: c.z, home: c.home })) }; },

@@ -32,6 +32,8 @@ export const P = {
   hole: { x: 18, z: 46, r: 1.7 },           // square peg, round hole
   crate: { x: 40, z: 50 },
   horse: { x: 60, z: -38 },                 // knows the way into the barn
+  pond: { x: 17, z: 14, depth: 3.4, s: 6 },   // a dip that fills with sea-level water; the pit path crosses it by bridge
+  islet: { x: -79, z: 79, r: 8 },            // the lighthouse rock, joined to the south-west headland by a causeway
   herring: { x: -72, z: 30 }, worms: { x: -70, z: -30 }, ducks: { x: 64, z: 65 },
 };
 // The three places the end of the rainbow might be.
@@ -48,9 +50,21 @@ export const FLATS = [
   { x: P.mill.x, z: P.mill.z, r: 6 },
   { x: P.stone.x, z: P.stone.z, r: 4 }, { x: P.coop.x, z: P.coop.z, r: 5 }, { x: P.kennel.x, z: P.kennel.z, r: 4 },
   { x: P.cats.x, z: P.cats.z, r: 4 }, { x: P.camp.x, z: P.camp.z, r: 6.5 }, { x: P.hole.x, z: P.hole.z, r: 4 },
-  { x: P.horse.x, z: P.horse.z, r: 4 },
+  { x: P.horse.x, z: P.horse.z, r: 4 }, { x: P.islet.x, z: P.islet.z, r: 4.5 },
 ];
 export const ISLAND_R = 82;
+// The coast is not a circle: three headlands push out from it, and one has an islet off its tip.
+export const HEADLAND = { n: 3, phase: 0.785, out: 13 };
+export const CAUSEWAY = { ax: -60, az: 60, bx: P.islet.x, bz: P.islet.z, hw: 2.6 };
+export const coastR = (x, z) => ISLAND_R + HEADLAND.out * Math.max(0, Math.sin(HEADLAND.n * Math.atan2(z, x) + HEADLAND.phase)) ** 1.5;
+// How far out to sea (x, z) is; zero or less on land.
+export function offshore(x, z) {
+  const c = CAUSEWAY, dx = c.bx - c.ax, dz = c.bz - c.az;
+  const t = clamp(((x - c.ax) * dx + (z - c.az) * dz) / (dx * dx + dz * dz), 0, 1);
+  return Math.min(Math.hypot(x, z) - coastR(x, z), Math.hypot(x - P.islet.x, z - P.islet.z) - P.islet.r, Math.hypot(x - c.ax - dx * t, z - c.az - dz * t) - c.hw);
+}
+// The bridge over the pond: a deck along the path, arched in the middle.
+export const BRIDGE = { x: P.pond.x, z: P.pond.z, dx: 0.64, dz: 0.768, half: 7, hw: 1.5, rise: 1.0 };
 export const WATER_Y = -0.55;
 // Direction to the sun. The bake and the real-time light both use it.
 export const SUN_DIR = [0.64, 0.5, 0.36];
@@ -58,6 +72,8 @@ export const SUN_DIR = [0.64, 0.5, 0.36];
 function rawY(x, z) {
   let y = 1.3 * Math.sin(x * 0.07) * Math.cos(z * 0.06) + 0.7 * Math.sin(x * 0.13 + 1.7) * Math.sin(z * 0.11 + 0.5) + 1.3;
   y += 11 * Math.exp(-((x - P.hill.x) ** 2 + (z - P.hill.z) ** 2) / (13 * 13));
+  y += 4.5 * Math.exp(-((x - P.stone.x) ** 2 + (z - P.stone.z) ** 2) / (9 * 9));           // the stone stands on a knoll
+  y -= P.pond.depth * Math.exp(-((x - P.pond.x) ** 2 + (z - P.pond.z) ** 2) / (P.pond.s * P.pond.s));
   return y;
 }
 export function groundY(x, z) {
@@ -66,8 +82,8 @@ export function groundY(x, z) {
     const t = 1 - smooth(f.r, f.r * 1.7, Math.hypot(x - f.x, z - f.z));
     if (t > 0) y += (rawY(f.x, f.z) - y) * t;
   }
-  const r = Math.hypot(x, z);
-  if (r > ISLAND_R) y -= ((r - ISLAND_R) / 10) ** 2 * 5;
+  const off = offshore(x, z);
+  if (off > 0) y -= (off / 10) ** 2 * 5;
   return y;
 }
 
@@ -98,8 +114,8 @@ export function pathDist(x, z) {
 }
 
 export const HAY_SPOTS = [[0, 0], [7, 3], [-6, 5], [4, -7], [-7, -5], [11, -5]].map(([dx, dz]) => ({ x: P.hay.x + dx, z: P.hay.z + dz }));
-// Eight places a four-leaf clover can turn up; each game uses four.
-export const CLOVERS = [[4, -66], [-69, -4], [64, -24], [-30, 66], [-52, -55], [70, 30], [30, 70], [-66, 40]].map(([x, z]) => ({ x, z }));
+// Nine places a four-leaf clover can turn up; each game uses four.
+export const CLOVERS = [[4, -66], [-69, -4], [64, -24], [-30, 66], [-52, -55], [70, 30], [30, 70], [-66, 40], [-75, 85]].map(([x, z]) => ({ x, z }));
 export const SIGNS = [
   { x: P.pen.x + 1, z: P.pen.z + 7.5 }, { x: P.hay.x - 2, z: P.hay.z + 11 }, { x: P.hill.x + 5, z: P.hill.z + 5 },
   { x: P.pit.x - 8, z: P.pit.z - 4 }, { x: P.snow.x + 4, z: P.snow.z - 5 },
@@ -122,6 +138,7 @@ export const SOLIDS = [
   { kind: 'tent', x: P.camp.x - 4.6, z: P.camp.z - 1.5, r: 1.7, h: 2.6 },
   { kind: 'pot', x: P.camp.x, z: P.camp.z, r: 0.95, h: 1.7 },
   { kind: 'horse', x: P.horse.x, z: P.horse.z, r: 1.5, h: 4.6 },
+  { kind: 'lighthouse', x: P.islet.x, z: P.islet.z, r: 2.4, h: 17 },
   { kind: 'silo', x: P.barn.x - 3, z: P.barn.z - 8, r: 2.2, h: 10.1 },
   { kind: 'mill', x: P.mill.x, z: P.mill.z, r: 3.1, h: 15 },
   { kind: 'well', x: -14, z: 15.5, r: 1.25, h: 3.2 },
@@ -149,7 +166,13 @@ export function standY(x, z) {
   const dx = x - P.barn.x, dz = z - P.barn.z;
   if (Math.abs(dz) < 4 && Math.abs(dx) < 5) return groundY(P.barn.x, P.barn.z) + BARN_FLOOR;
   if (Math.abs(dz) < DOOR_HW + 0.3 && dx >= 5 && dx < 5 + BARN_RAMP) return Math.max(groundY(x, z), groundY(P.barn.x, P.barn.z) + BARN_FLOOR * (1 - (dx - 5) / BARN_RAMP));
+  const b = BRIDGE, along = (x - b.x) * b.dx + (z - b.z) * b.dz, across = (x - b.x) * b.dz - (z - b.z) * b.dx;
+  if (Math.abs(along) < b.half && Math.abs(across) < b.hw) return Math.max(groundY(x, z), bridgeY(along));
   return groundY(x, z);
+}
+export function bridgeY(along) {
+  const b = BRIDGE, end = (groundY(b.x + b.dx * b.half, b.z + b.dz * b.half) + groundY(b.x - b.dx * b.half, b.z - b.dz * b.half)) / 2;
+  return end + 0.12 + b.rise * (1 - (along / b.half) ** 2);
 }
 
 // Trees, and boulders too big to walk through.
@@ -162,7 +185,7 @@ export const BOULDERS = [];
     [0, 0, 13], [P.hill.x, P.hill.z, 15], [P.mill.x, P.mill.z, 10], [P.field.x, P.field.z, 10.5],
     [P.stone.x, P.stone.z, 7], [P.coop.x, P.coop.z, 9], [P.kennel.x, P.kennel.z, 7], [P.cats.x, P.cats.z, 7], [P.camp.x, P.camp.z, 10],
     [P.hole.x, P.hole.z, 6.5], [P.crate.x, P.crate.z, 5], [P.horse.x, P.horse.z, 7], [P.herring.x, P.herring.z, 4], [P.worms.x, P.worms.z, 4],
-    ...FAIRY_RINGS.map((f) => [f.x, f.z, 6]), ...CAT_STARTS.map((c) => [c.x, c.z, 4]),
+    [P.pond.x, P.pond.z, 9.5], ...FAIRY_RINGS.map((f) => [f.x, f.z, 6]), ...CAT_STARTS.map((c) => [c.x, c.z, 4]),
     ...SOLIDS.filter((s) => s.r && s.r < 2 && s.kind !== 'elephant').map((s) => [s.x, s.z, 4]),
     ...CLOVERS.map((c) => [c.x, c.z, 4]), ...SIGNS.map((s) => [s.x, s.z, 4]), ...COW_STARTS.map((c) => [c.x, c.z, 5]),
   ];
