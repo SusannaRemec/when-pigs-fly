@@ -1148,10 +1148,22 @@ canvas.addEventListener('pointermove', (e) => {
 const endTouch = (e) => { tele.note(e.type === 'pointercancel' ? 'touch cancelled' : 'touch-', e.pointerId); if (e.pointerId === touch.id) { touch.id = null; touch.turn = 0; touch.fwd = 0; } };
 canvas.addEventListener('pointerup', endTouch);
 canvas.addEventListener('pointercancel', endTouch);
+// The flap button is held for as long as a finger that went down on it is still down. The lift is
+// listened for on the whole window and checked against the phone's own list of touches, because a
+// phone that takes a touch away (a long press, one finger too many) does not always tell the button.
 const fb = $('flapBtn');
-fb.addEventListener('pointerdown', (e) => { e.preventDefault(); flapQueued = true; holdFlap = true; });
-fb.addEventListener('pointerup', () => (holdFlap = false));
-fb.addEventListener('pointercancel', () => (holdFlap = false));
+const flapTouches = new Set();
+const dropFlap = (why) => { if (flapTouches.size) tele.note('flap let go', why); flapTouches.clear(); holdFlap = false; };
+fb.addEventListener('pointerdown', (e) => { e.preventDefault(); flapTouches.add(e.pointerId); flapQueued = true; holdFlap = true; });
+for (const type of ['pointerup', 'pointercancel']) {
+  window.addEventListener(type, (e) => { if (flapTouches.delete(e.pointerId) && !flapTouches.size) holdFlap = false; });
+}
+for (const type of ['touchend', 'touchcancel']) {
+  window.addEventListener(type, (e) => { if (flapTouches.size && ![...e.touches].some((t) => t.target === fb)) dropFlap(type); }, { passive: true });
+}
+document.addEventListener('visibilitychange', () => dropFlap('page hidden'));
+// A long press must not open the phone's menu over the controls: the menu swallows the lift.
+for (const el of [fb, $('oinkBtn'), canvas]) el.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ---------------------------------------------------------------- update
 function doFlap() {
@@ -1992,5 +2004,6 @@ window.__wpf = {
   face(a) { yaw = a; },
   view(...v) { debugCam = v.length === 6 ? v : null; },
   keys, begin, step, groundY, tele, touch, ball, MOON_POS, dice,
+  get holdFlap() { return holdFlap; },
   press(code, on) { keys[code] = on; if (code === 'Space') { holdFlap = on; if (on) flapQueued = true; } },
 };

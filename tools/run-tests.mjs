@@ -98,6 +98,21 @@ async function game(name, viewport, feats, partNos, expect) {
   check(`${name}: the start card fits the screen`, card);
   await shoot(name + '-start');
   await evaluate(`localStorage.clear(); window.__wpf.begin()`);
+  // A phone can take a touch off the flap button without telling the button. The pig must still stop flapping.
+  const flap = JSON.parse(await evaluate(`(() => {
+    const w = window.__wpf, fb = document.getElementById('flapBtn'), out = {};
+    const down = (id) => fb.dispatchEvent(new PointerEvent('pointerdown', { pointerId: id, pointerType: 'touch', bubbles: true }));
+    down(7); out.held = w.holdFlap;
+    window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 7, pointerType: 'touch' })); out.afterCancel = w.holdFlap;
+    down(8); window.dispatchEvent(Object.assign(new Event("touchend"), { touches: [] })); out.afterEmptyTouchend = w.holdFlap; // no pointer event at all, and no touches left
+    down(9); down(10); window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 9, pointerType: 'touch' })); out.oneOfTwoLeft = w.holdFlap;
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 10, pointerType: 'touch' })); out.bothLifted = w.holdFlap;
+    const a = document.getElementById('back').getBoundingClientRect(), b = document.getElementById('stuckBtn').getBoundingClientRect();
+    out.gap = Math.round(Math.max(b.left - a.right, a.left - b.right, b.top - a.bottom, a.top - b.bottom));
+    return JSON.stringify(out);
+  })()`));
+  check(`${name}: the flap button lets go when the lift goes missing`, flap.held === true && flap.afterCancel === false && flap.afterEmptyTouchend === false && flap.oneOfTwoLeft === true && flap.bothLifted === false, JSON.stringify(flap));
+  if (viewport.mobile) check(`${name}: "stuck?" is well clear of the launcher link`, flap.gap >= 40, `gap ${flap.gap}px`);
   const seen = {};
   for (const n of partNos) Object.assign(seen, JSON.parse(await evaluate(parts[n])));
   for (const [key, want] of Object.entries(expect)) check(`${name}: ${key}`, typeof want === 'function' ? want(seen[key]) : seen[key] === want, `saw ${JSON.stringify(seen[key])}`);

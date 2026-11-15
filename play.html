@@ -56,6 +56,7 @@
   #stuckBtn { position:fixed; left:16px; top:150px; pointer-events:auto; cursor:pointer; background:none; border:0; padding:0; font:800 12px inherit; font-family:inherit; color:#fff; opacity:.75; text-shadow:0 1px 3px rgba(59,29,58,.8); z-index:3; }
   #stuckBtn.on { opacity:1; background:var(--gold); color:var(--plum); text-shadow:none; border:2px solid var(--plum); border-radius:9px; padding:5px 10px; box-shadow:2px 2px 0 var(--plum); }
   #oinkBtn { display:none; position:fixed; right:128px; bottom:60px; width:64px; height:64px; border-radius:50%; font-size:12px; padding:0; z-index:3; touch-action:none; }
+  #flapBtn, #oinkBtn, #stuckBtn { -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   @media (pointer: coarse) { #flapBtn, #oinkBtn { display:block; } #help { display:none; } }
   @media (max-width: 640px) {
     /* narrow screens: meter across the top, the list as a strip of chips under it, messages low down */
@@ -66,7 +67,7 @@
     #feats li.secrets { margin:0; padding:1px 0; border:0; font-size:10.5px; }
     #toast { top:auto; bottom:178px; font-size:14px; padding:8px 12px; width:max-content; max-width:92vw; }
     #back { top:auto; bottom:12px; left:10px; }
-    #stuckBtn { top:auto; bottom:10px; left:104px; }
+    #stuckBtn { top:auto; bottom:2px; left:50%; transform:translateX(-50%); padding:10px 16px; } /* well clear of the launcher link */
     #help { display:none; } /* no room beside the launcher link; the start card lists the keys */
     .overlay { padding:12px; }
     .card { padding:18px 16px; }
