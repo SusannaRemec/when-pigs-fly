@@ -70,7 +70,7 @@
 })()
 
 // The later secrets. Run after the script above, or on its own after pressing Start:
-//   eval((await (await fetch('./tools/playtest.js')).text()).split('// ---8<---')[1])
+//   eval((await (await fetch('./tools/playtest.js')).text()).split('// ---8<---').pop())
 // ---8<---
 (async () => {
   const w = window.__wpf, P = w.places.P, log = {};
