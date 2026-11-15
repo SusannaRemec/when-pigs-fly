@@ -9,6 +9,8 @@
   :root { --plum:#3b1d3a; --pink:#ff9db5; --cream:#fff6e9; --gold:#ffc93c; }
   * { box-sizing: border-box; }
   html, body { margin:0; height:100%; overflow:hidden; background:#9fd3ff; font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif; color:var(--plum); }
+  /* nothing on the game page is for selecting: a long press while steering must not bring up the phone's copy / translate bubble */
+  html, body { -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
   canvas#c { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
   .display { font-family: "Cooper Black", "Rockwell Extra Bold", "Rockwell", Georgia, serif; }
   #hud { position:fixed; inset:0; pointer-events:none; user-select:none; }

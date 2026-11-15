@@ -1164,6 +1164,7 @@ for (const type of ['touchend', 'touchcancel']) {
 document.addEventListener('visibilitychange', () => dropFlap('page hidden'));
 // A long press must not open the phone's menu over the controls: the menu swallows the lift.
 for (const el of [fb, $('oinkBtn'), canvas]) el.addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('selectstart', (e) => e.preventDefault());
 
 // ---------------------------------------------------------------- update
 function doFlap() {
