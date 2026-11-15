@@ -4,6 +4,7 @@
   "description": "When Pigs Fly: a browser 3D improbability game and its launcher page",
   "scripts": {
     "start": "python3 -m http.server 4173",
+    "test": "node tools/test-node.mjs && node tools/run-tests.mjs",
     "bake": "node tools/dump-layout.mjs && blender -b --python blender/world_bake.py",
     "bake:critters": "blender -b --python blender/critters.py",
     "bake:draft": "node tools/dump-layout.mjs && blender -b --python blender/world_bake.py -- --draft --no-save"

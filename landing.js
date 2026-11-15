@@ -90,8 +90,8 @@ function resize() {
   wide = w / h > 1.05;
   // On wide screens the pig sits to the right of the headline; on narrow ones, above it.
   const halfH = Math.tan((camera.fov * Math.PI) / 360) * camera.position.z;
-  rig.userData.home = wide ? new THREE.Vector3(halfH * camera.aspect * 0.46, 0.3, 0) : new THREE.Vector3(0, halfH * 0.48, 0);
-  rig.scale.setScalar(wide ? Math.min(1.25, 0.75 + camera.aspect * 0.22) : 0.82);
+  rig.userData.home = wide ? new THREE.Vector3(halfH * camera.aspect * 0.46, 0.3, 0) : new THREE.Vector3(0, camera.position.y + halfH * 0.6, 0);
+  rig.scale.setScalar(wide ? Math.min(1.25, 0.75 + camera.aspect * 0.22) : 0.5); // small enough on a phone to clear the headline
 }
 window.addEventListener('resize', resize);
 resize();

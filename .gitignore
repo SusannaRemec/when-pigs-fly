@@ -7,3 +7,5 @@ blender/renders/*_bake.png
 blender/renders/ground_albedo.png
 blender/renders/critters_*.png
 blender/renders/keyart_draft.png
+# screenshots from `npm test`
+tools/shots/

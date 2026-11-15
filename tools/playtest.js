@@ -1,8 +1,12 @@
-// Automated run through the seven newer jobs, the barn puzzle and the secrets. It steers and
-// teleports the pig through the game's test hooks, so it checks the rules, not how they feel.
-// In the browser console on play.html?feats=stone,hens,dog,cats,pot, after pressing Start:
-//   eval(await (await fetch('./tools/playtest.js')).text()).then(console.log)
-// It leaves a best time and win count in localStorage.
+// Automated play-through. It steers and teleports the pig through the game's test hooks
+// (window.__wpf), stepping the simulation by hand, so it checks the rules, not how they feel.
+// `npm test` runs all of it in a headless browser (tools/run-tests.mjs) and fails on any false.
+//
+// Three parts, separated by a scissors line; each returns a JSON string of what it saw.
+//   Part 1 and 2 expect play.html?feats=stone,hens,dog,cats,pot   (the seven newer jobs, the barn, the secrets)
+//   Part 3 expects       play.html?feats=needle,clover,lightning,hell,cows   (the first five jobs, then the flight to the win)
+// By hand, in the console after pressing Start (n is 0, 1 or 2):
+//   eval((await (await fetch('./tools/playtest.js')).text()).split('\n// ---8<---\n')[n]).then(console.log)
 (async () => {
   const w = window.__wpf, g = w.groundY, P = w.places.P, log = {};
   const run = (sec, each) => { for (let t = 0; t < sec; t += 1 / 60) { if (each) each(); w.step(1 / 60); } };
@@ -69,8 +73,7 @@
   return JSON.stringify(log);
 })()
 
-// The later secrets. Run after the script above, or on its own after pressing Start:
-//   eval((await (await fetch('./tools/playtest.js')).text()).split('// ---8<---').pop())
+// Part 2: the later secrets.
 // ---8<---
 (async () => {
   const w = window.__wpf, P = w.places.P, log = {};
@@ -90,5 +93,59 @@
   w.press('ShiftLeft', false); w.press('KeyW', false);
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' })); run(0.2);
   log.found = Object.keys(w.found).join(); log.foundN = w.state.foundN; log.stats = JSON.stringify(w.stats);
+  return JSON.stringify(log);
+})()
+// ---8<---
+(async () => {
+  const w = window.__wpf, P = w.places.P, log = {};
+  const run = (sec, each) => { for (let t = 0; t < sec; t += 1 / 60) { if (each && each() === false) return; w.step(1 / 60); } };
+  for (const k in w.keys) w.keys[k] = false;
+  // needle: root through every haystack
+  for (const s of w.places.stacks) { w.teleport(s.x + 1.5, null, s.z); run(0.3); }
+  log.needle = w.state.feats.needle;
+  // clovers: the four that are out this game
+  for (const c of w.places.clovers) { w.teleport(c.x + 0.5, null, c.z); run(0.3); }
+  log.clover = w.state.feats.clover;
+  // lightning: stand by the rod and stay put
+  w.teleport(w.places.rod.x + 1, null, w.places.rod.z); run(7);
+  log.lightning = w.state.feats.lightning;
+  // snowball: nudge it from the side away from the pit until it rolls in
+  for (let i = 0; i < 80 && !w.ball.gone; i++) {
+    const pit = w.places.pit, a = Math.atan2(w.ball.x - pit.x, w.ball.z - pit.z);
+    w.teleport(w.ball.x + Math.sin(a) * 2, null, w.ball.z + Math.cos(a) * 2); run(0.9);
+  }
+  log.hell = w.state.feats.hell;
+  // cows: stay on the far side of each from the pen, and she walks away from the pig toward it
+  for (let i = 0; i < 2; i++) {
+    run(90, () => {
+      const c = w.state.cows[i]; if (c.home) return false;
+      const a = Math.atan2(c.x - P.pen.x, c.z - P.pen.z);
+      w.teleport(c.x + Math.sin(a) * 5, null, c.z + Math.cos(a) * 5);
+    });
+  }
+  log.cows = w.state.feats.cows; log.count = w.state.count;
+  // the blue moon rises a few seconds after the fifth job
+  w.teleport(0, null, 0); run(5);
+  log.finale = w.state.finale;
+  // fly the rings for real: hold the wings, climb when below the ring, steer at it
+  w.press('KeyW', true);
+  const rings = w.places.rings;
+  run(150, () => {
+    const s = w.state; if (s.won) return false;
+    const r = rings[s.ringIdx]; if (!r) return false;
+    const flat = Math.hypot(r[0] - s.x, r[2] - s.z);
+    w.face(Math.atan2(r[0] - s.x, r[2] - s.z));
+    w.press('Space', s.y + 1.3 < r[1] + 0.5);
+    w.press('KeyW', flat > 2.5 || Math.abs(s.y + 1.3 - r[1]) < 3); // hover under a ring that is still overhead
+  });
+  w.press('KeyW', false); w.press('Space', false);
+  log.rings = w.state.ringIdx; log.won = w.state.won; log.flightSeconds = Math.round(w.state.time);
+  run(3);
+  log.winScreen = !document.getElementById('win').classList.contains('hidden');
+  // two secrets the other parts cannot reach: the moon, and the pond
+  w.teleport(w.MOON_POS.x, w.MOON_POS.y + 11, w.MOON_POS.z); run(0.1);
+  w.teleport(P.pond.x + 3, null, P.pond.z); run(0.3);
+  log.cheese = !!w.found.cheese; log.fish = !!w.found.fish;
+  log.errors = w.tele.faults;
   return JSON.stringify(log);
 })()

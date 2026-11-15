@@ -10,6 +10,7 @@ import { loadCritters, pose } from './critters.js';
 import { createPig } from './pig.js';
 import { Sfx } from './audio.js';
 import { createRecorder } from './telemetry.js';
+import { steer, fall, contain, collide, land } from './move.js';
 
 // ---------------------------------------------------------------- setup
 const $ = (id) => document.getElementById(id);
@@ -405,7 +406,12 @@ const pig = createPig(critters);
 scene.add(pig.group);
 const pos = new THREE.Vector3(0, groundY(0, 0), 0);
 let yaw = 0.5, speed = 0, vy = 0, grounded = true, flaps = 0, soot = 0;
-let wingScale = 0.22, autoFlapT = 0, shoreX = 0, shoreZ = 0;
+let wingScale = 0.22, autoFlapT = 0;
+const shore = { x: 0, z: 0 }; // the last spot the sea allowed
+// move.js works on a plain body; these copy the pig into one and back.
+const body = {};
+const pack = () => Object.assign(body, { x: pos.x, y: pos.y, z: pos.z, yaw, speed, vy, grounded });
+const unpack = () => { pos.set(body.x, body.y, body.z); ({ yaw, speed, vy, grounded } = body); };
 pig.setWingScale(wingScale);
 
 // ---------------------------------------------------------------- game state
@@ -417,6 +423,15 @@ let count = 0, started = false, won = false, finale = false, time = 0, firstPers
 
 const toastEl = $('toast');
 let toastT = 0;
+// Things that happen a little later happen in game time, not by the wall clock, so slow motion,
+// a hidden tab and a test stepping the game by hand all see them at the same moment.
+const pending = [];
+const later = (sec, fn) => pending.push({ at: clock + sec, fn });
+let clock = 0;
+function runPending(dt) {
+  clock += dt;
+  for (let i = pending.length - 1; i >= 0; i--) if (pending[i].at <= clock) pending.splice(i, 1)[0].fn();
+}
 function say(text, dur = 4.5) {
   toastEl.textContent = text;
   toastEl.classList.add('show');
@@ -457,10 +472,10 @@ function complete(key, line) {
   if (count < 5) {
     say(line, 4);
     const note = WING_NOTES[count];
-    setTimeout(() => say(note, 4), 4200);
+    later(4.2, () => say(note, 4));
   } else {
     say(line, 3.5);
-    setTimeout(startFinale, 3600);
+    later(3.6, startFinale);
   }
   refreshHud();
 }
@@ -820,18 +835,18 @@ function oinkReact() {
   stats.oinks++;
   const near = (x, z, d) => hd(x, z) < d;
   let line = null;
-  for (const c of cows) if (near(c.x, c.z, 13)) { c.hop = 1; setTimeout(() => sfx.moo(), 350); line = 'The cow has no comment. Actually, one comment.'; }
+  for (const c of cows) if (near(c.x, c.z, 13)) { c.hop = 1; later(0.35, () => sfx.moo()); line = 'The cow has no comment. Actually, one comment.'; }
   for (const h of [...hens, roadHen]) if (near(h.x, h.z, 9)) { h.hop = 1; sfx.cluck(); line = 'The hens consider this an emergency.'; }
   for (const c of cats) if (!c.home && near(c.x, c.z, 10)) { c.hop = 1; c.heading = Math.atan2(c.x - pos.x, c.z - pos.z); sfx.meow(); line = 'The cat pretends that was beneath its notice. It was not.'; }
-  if (feats.dog && near(dog.x, dog.z, 10)) { dog.hop = 1; setTimeout(() => sfx.bark(), 250); line = 'He oinks back, in dog.'; }
-  if (near(poke.x, poke.z, 12)) { poke.hop = 1; setTimeout(() => sfx.muffled(), 400); line = line || 'Something in that sack agrees with you.'; }
-  if (inBarn()) { setTimeout(() => { sfx.trumpet(); jolt(0.5); }, 300); line = 'The elephant never forgets a rude noise.'; }
+  if (feats.dog && near(dog.x, dog.z, 10)) { dog.hop = 1; later(0.25, () => sfx.bark()); line = 'He oinks back, in dog.'; }
+  if (near(poke.x, poke.z, 12)) { poke.hop = 1; later(0.4, () => sfx.muffled()); line = line || 'Something in that sack agrees with you.'; }
+  if (inBarn()) { later(0.3, () => { sfx.trumpet(); jolt(0.5); }); line = 'The elephant never forgets a rude noise.'; }
   else if (near(P.horse.x, P.horse.z, 8)) line = 'The horse does not dignify that with a reply.';
   else if (near(P.stone.x, P.stone.z, 7)) line = 'The stone has heard worse.';
   else if (near(P.field.x, P.field.z, 9)) line = 'The scarecrow is outstanding in his field. He says nothing.';
   else if (near(62, 17.5, 6)) line = 'The snowman gives you a frosty reception.';
   else if (near(P.camp.x, P.camp.z, 7) && !feats.pot) line = 'A watched pot does not respond to heckling.';
-  else if (near(P.hill.x, P.hill.z, 9)) { setTimeout(() => sfx.muffled(), 700); line = line || '…oink. Nice echo up here.'; }
+  else if (near(P.hill.x, P.hill.z, 9)) { later(0.7, () => sfx.muffled()); line = line || '…oink. Nice echo up here.'; }
   if (line) quip(line);
 }
 const IDLE_LINES = ['The pig is waiting for the cows to come home.', 'Somewhere, a pot is not being watched.', 'The odds are not improving on their own.', 'A lovely spot to do nothing. Carry on.', 'The pig considers its options. There are five.'];
@@ -1020,7 +1035,7 @@ function win() {
   startRain();
   moonCow.cr = critters.make('cow');
   scene.add(moonCow.cr.group);
-  setTimeout(() => say('And the cow jumped over the moon. Show-off.', 5), 9000);
+  later(9, () => say('And the cow jumped over the moon. Show-off.', 5));
   const rank = foundN >= SECRET_COUNT ? 'The whole hog' : foundN >= 10 ? 'High on the hog' : foundN >= 6 ? 'Hog wild' : foundN >= 3 ? 'Swine of the times' : 'Ham-ateur';
   const missing = Object.keys(HINTS).filter((k) => !found[k]);
   $('winStats').innerHTML = `Rank: <b>${rank}</b> · Oinks ${stats.oinks} · Trees headbutted ${stats.trees} · Hens given a lift ${stats.rides} · Secrets ${foundN}/${SECRET_COUNT}`
@@ -1028,7 +1043,7 @@ function win() {
   jolt(0.6);
   refreshHud();
   say('Pigs fly.', 3);
-  setTimeout(() => $('win').classList.remove('hidden'), 2200);
+  later(2.2, () => $('win').classList.remove('hidden'));
 }
 
 // ---------------------------------------------------------------- input
@@ -1146,12 +1161,10 @@ function updatePig(dt) {
   const fwd = clamp((keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + touch.fwd, -1, 1);
   const sprint = keys.ShiftLeft || keys.ShiftRight || touch.fwd > 0.95;
 
-  yaw += turn * (grounded ? 2.6 : 2.1) * dt;
-  const maxF = grounded ? (sprint ? 13.5 : 9) : 10 + count * 1.7;
-  const target = fwd > 0 ? maxF * fwd : fwd * 4;
-  speed += (target - speed) * Math.min(1, dt * (grounded ? 6 : 2.2));
-  pos.x += Math.sin(yaw) * speed * dt;
-  pos.z += Math.cos(yaw) * speed * dt;
+  // The body's own motion lives in move.js, which the tests run too.
+  pack();
+  steer(body, { turn, fwd, sprint, airSpeed: 10 + count * 1.7 }, dt);
+  unpack();
 
   if (flapQueued) { doFlap(); autoFlapT = 0.34; }
   flapQueued = false;
@@ -1160,59 +1173,24 @@ function updatePig(dt) {
     if (autoFlapT <= 0) { doFlap(); autoFlapT = 0.34; }
   }
 
+  pack();
+  fall(body, holdFlap && count >= 2 ? -(8 - count * 1.2) : null, dt); // held wings glide
+  unpack();
   if (!grounded) {
-    vy -= 22 * dt;
-    if (holdFlap && count >= 2) vy = Math.max(vy, -(8 - count * 1.2)); // glide
-    pos.y += vy * dt;
     if (pos.y > 135) { pos.y = 135; vy = Math.min(vy, 0); }
     if (inBarn() && pos.y > barnBase + 3.4) { pos.y = barnBase + 3.4; vy = Math.min(vy, 0); } // rafters
   }
 
-  // stay near the island
-  const r = Math.hypot(pos.x, pos.z);
-  if (r > 185) { pos.x *= 185 / r; pos.z *= 185 / r; }
-  if (grounded && offshore(pos.x, pos.z) > 7) { // wading has a limit: slide along it, or failing that drift home
-    if (offshore(pos.x, shoreZ) <= 7) pos.z = shoreZ;
-    else if (offshore(shoreX, pos.z) <= 7) pos.x = shoreX;
-    else if (offshore(shoreX, shoreZ) <= 7) { pos.x = shoreX; pos.z = shoreZ; }
-    else { pos.x *= 0.985; pos.z *= 0.985; }
+  pack();
+  contain(body, shore, offshore);
+  collide(body, dt, colliders, (c) => tele.hit(c.kind));
+  const landedAt = land(body, standY);
+  unpack();
+  if (landedAt !== null) {
+    if (landedAt < -11) { sfx.thud(); burst(pos.clone(), 0xd8c9a0, 8, 3, 6); jolt(0.25); }
+    squash = Math.min(0.42, -landedAt * 0.03);
   }
-  shoreX = pos.x; shoreZ = pos.z;
-
-  // obstacles
-  for (const c of colliders) {
-    if (pos.y > c.top || (c.bottom !== undefined && pos.y < c.bottom)) continue;
-    if (c.r !== undefined) {
-      const dx = pos.x - c.x, dz = pos.z - c.z, d = Math.hypot(dx, dz), min = c.r + 0.9;
-      if (d < min && d > 0.0001) {
-        tele.hit(c.kind);
-        // push out, and slip sideways so a head-on bump slides past
-        const side = Math.sin(yaw) * dz - Math.cos(yaw) * dx >= 0 ? 1 : -1;
-        const slip = Math.abs(speed) * 0.6 * dt * side;
-        pos.x = c.x + (dx / d) * min + (dz / d) * slip;
-        pos.z = c.z + (dz / d) * min - (dx / d) * slip;
-      }
-    } else {
-      const dx = pos.x - c.x, dz = pos.z - c.z, hx = c.hx + 0.9, hz = c.hz + 0.9;
-      if (Math.abs(dx) < hx && Math.abs(dz) < hz) {
-        tele.hit(c.kind);
-        if (hx - Math.abs(dx) < hz - Math.abs(dz)) pos.x = c.x + Math.sign(dx || 1) * hx;
-        else pos.z = c.z + Math.sign(dz || 1) * hz;
-      }
-    }
-  }
-
-  const gy = Math.max(standY(pos.x, pos.z), -1.0);
-  if (pos.y <= gy || (grounded && pos.y - gy < 0.7)) {
-    if (!grounded) {
-      if (vy < -11) { sfx.thud(); burst(pos.clone(), 0xd8c9a0, 8, 3, 6); jolt(0.25); }
-      squash = Math.min(0.42, -vy * 0.03);
-      grounded = true;
-    }
-    pos.y = gy; vy = 0; flaps = count;
-  } else {
-    grounded = false;
-  }
+  if (grounded) flaps = count;
 
   // wings grow toward their earned size
   const targetWing = 0.22 + count * 0.156;
@@ -1233,7 +1211,7 @@ function updatePig(dt) {
   const bank = grounded ? 0 : -turn * 0.35;
   pig.group.rotation.z += (bank - pig.group.rotation.z) * Math.min(1, dt * 5);
   pig.update(dt, { speed: Math.abs(speed), airborne: !grounded, t: time });
-  tele.tick(dt, { x: pos.x, y: pos.y, z: pos.z, yaw, speed, vy, grounded, ground: gy, fwd, turn });
+  tele.tick(dt, { x: pos.x, y: pos.y, z: pos.z, yaw, speed, vy, grounded, ground: Math.max(standY(pos.x, pos.z), -1), fwd, turn });
   if (!tele.stuck && !pictureLost && !tele.faults) stuckBtn?.classList.remove('on');
 }
 
@@ -1494,7 +1472,7 @@ function updateFeats(dt) {
         const did = ev.hop ? 'hop' : ev.oink ? 'oink' : dog.spin > 5.9 ? 'spin' : null;
         if (did === want) {
           dog.act = want; dog.actT = 0; dog.step++; dog.spin = 0;
-          if (want === 'oink') setTimeout(() => sfx.bark(), 250);
+          if (want === 'oink') later(0.25, () => sfx.bark());
         } else if (did === 'spin') dog.spin = 0;
         else if (did && dog.nag <= 0) { dog.nag = 2.5; say(`He tilts his head. Not that one: ${TRICK[want]}.`, 3); }
       }
@@ -1927,6 +1905,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 function step(dt) {
+  runPending(dt);
   if (started) {
     if (!won) time += dt;
     updatePig(dt);
@@ -1979,6 +1958,6 @@ window.__wpf = {
   teleport(x, y, z) { pos.set(x, y === null ? standY(x, z) : y, z); vy = 0; grounded = y === null; },
   face(a) { yaw = a; },
   view(...v) { debugCam = v.length === 6 ? v : null; },
-  keys, begin, step, groundY, tele, touch,
+  keys, begin, step, groundY, tele, touch, ball, MOON_POS,
   press(code, on) { keys[code] = on; if (code === 'Space') { holdFlap = on; if (on) flapQueued = true; } },
 };

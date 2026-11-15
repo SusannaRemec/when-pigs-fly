@@ -16,6 +16,7 @@ Contents:
 5. [Mistakes, and the rule each one taught](#5-mistakes-and-the-rule-each-one-taught)
 6. [Prompts that worked](#6-prompts-that-worked)
 7. [Where this build stands](#7-where-this-build-stands)
+8. [What others recommend, and how this build compares](#8-what-others-recommend-and-how-this-build-compares)
 
 ## 1. What you need
 
@@ -80,8 +81,9 @@ This project left it too late. Do it here, so every later step has something to 
 
 **Step 4. Write an automated play-through and keep it passing.**
 A script steers the pig through the jobs using the test hooks, stepping the simulation by hand so
-a whole game runs in a couple of seconds. This project wrote it later, and it covers only the
-newer jobs. Written here, it grows one job at a time.
+a whole game runs in a couple of seconds. This project wrote it late and by halves, and paid for
+it (section 7). Written here, it grows one job at a time. Keep anything the test must wait for on
+game time, not the wall clock, or a fast test will race it.
 *Finished when* one command plays the game to the win and reports each job.
 
 **Step 5. Widen the game: a pool of content and a seeded draw.**
@@ -149,14 +151,15 @@ screen and a slow machine, and send it to someone who has never seen it.
 
 ## 4. How to check work you cannot see or hear
 
-An agent's "done" means little without evidence. Five checks were used. Each one says what it
+An agent's "done" means little without evidence. Six checks are used. Each one says what it
 proves and what it does not.
 
 | Check | How | Proves | Does not prove |
 |---|---|---|---|
 | Console after loading | Load the page and read the console | Every module and asset arrived | That anything looks right |
 | Screenshots | `__wpf.view(...)` places a debug camera; take several angles after each visual change, HUD included | What the player will see | How it moves |
-| Play-through | `tools/playtest.js`, run from the console as its first lines describe | The rules of the jobs it covers | Feel, difficulty, or jobs it does not cover |
+| Play-through | `npm test` plays all twelve jobs, the flight and the win in headless Chrome, at desktop and phone size, and saves screenshots to `tools/shots/` | The rules, that nothing throws, that nothing runs off the screen | Feel and difficulty |
+| Walk-away | `npm test` also walks a pig from 26,000 spots with the game's own movement code (`src/move.js`) | That no spot on the island traps the pig | Anything that is not walking |
 | Sound check | Open `tools/sound-check.html`; each sound is rendered without speakers and measured | Levels, length, clipping | Whether a moo sounds like a cow |
 | Narrow screen | Load the game in a frame 390 pixels wide | The HUD fits a phone's width | Touch controls, which need a real phone |
 
@@ -221,34 +224,80 @@ requests such as "make it funnier" worked because the premise supplied the mater
 
 ## 7. Where this build stands
 
-Checked on 14 November 2026 against the code in this repository.
+Checked on 14 November 2026 against the code in this repository, with `npm test` (68 checks,
+about twenty seconds).
 
 **What holds up**
 
-- The play-through passes: the five jobs it was given, the finale trigger, the barn puzzle and
-  13 secrets, in about two seconds, with no console errors.
+- All twelve jobs, the finale, the flight through the seven rings, the win screen, the barn
+  puzzle and all fifteen secrets are played automatically, across a desktop and a phone-sized screen.
+  Breaking the win on purpose makes the run fail.
+- No spot on the island traps a walking pig, with the barn door shut or open, at 60 or 20 frames
+  a second.
 - `blender/layout.json` matches `src/layout.js`, and a draft bake passes the ground-height
   assert.
 - No sound clips. The loudest case measured (thunder, a job fanfare, an oink and the full band
   together) peaks at -5.1 dB.
-- At 390 pixels wide nothing in the HUD runs off the screen.
-- The whole game is about 5.4 MB to download and needs no build step.
+- The launcher and the game fit a screen 390 pixels wide, and neither throws on load.
+- One bad frame no longer stops the game, and a player who gets stuck can free the pig and hand
+  over a report of the last ten seconds.
 
-**What the next game should do better**
+**What is still weak**
 
-- **The play-through covers part of the game.** It plays 7 of the 12 jobs (not the needle,
-  clovers, lightning, snowball or cows), finds 13 of the 15 secrets, and stops when the finale
-  begins, so the flight over the moon and the win screen are never tested. It is also pasted into
-  the console by hand. Step 4 exists to prevent this.
+- **A freeze on a real phone is unexplained.** A player's game stopped responding on Lightning
+  Hill; nothing here reproduces it. The recorder is in place to catch it next time.
 - **A draft bake overwrites the shipped world.** `npm run bake:draft` writes a draft-quality
-  `assets/world.glb` over the real one, and nothing stops it being committed. Drafts should go
-  to their own file.
-- **One file holds the game.** `src/game.js` is 1,932 lines. It worked for one session; it will
-  be slow to change in a second.
-- **The world is most of the download.** `assets/world.glb` is 4.7 MB of the 5.4 MB.
-- **The sound check's pitch figure is unreliable** for short, noisy sounds (it reports the wing
-  flap at 37 kHz). Trust its levels, not its pitch.
-- **A narrow desktop window** puts the key hints on top of the launcher link. Phones hide the
-  hints, so they are unaffected.
-- **Not checked here:** how the sound pass sounds to a person, touch controls on a real phone,
-  and a slow machine. None of these can be checked by an agent.
+  `assets/world.glb` over the real one, and nothing stops it being committed.
+- **One file still holds most of the game.** The pig's movement, the layout, the sound and the
+  recorder are separate modules with no three.js in them; the other 1,900 lines of
+  `src/game.js` share one set of variables and were left alone.
+- **The world is most of the download.** `assets/world.glb` is 4.7 MB of the 5.4 MB, and its two
+  large baked textures are the likeliest cause of trouble on a phone short of memory.
+- **The sound check's pitch figure is unreliable** for short, noisy sounds. Trust its levels.
+- **Not checked by any of this:** how it sounds to a person, touch controls under a real thumb,
+  a slow machine, and whether it is fun.
+
+## 8. What others recommend, and how this build compares
+
+Read on 14 November 2026: Anthropic's prompting guide, Simon Willison's account of having
+Claude Fable 5 build a browser game from one prompt, a game engineer's summary of the Fable
+guide, and a collection of one-prompt builds for Fable 5.2. Links are at the end. Most of it is
+individual experience, not measurement.
+
+| Recommended | Here | Verdict |
+|---|---|---|
+| Describe what the player sees and does before naming any technology. | The first prompt was the idiom and "a launcher page", nothing about engines. | Matched. |
+| Build the smallest playable version first. | Step 2: boxes, five jobs, a win. | Matched. |
+| Have the agent make its own assets. | Blender models and bakes, synthesised sound, no downloads. | Matched, and went further than the examples. |
+| Follow with short, open requests ("make it a lot more fun"). | Section 6. | Matched. |
+| Let it work without stopping to ask. | Done throughout. | Matched. |
+| Give it a pass-or-fail check it can run itself, and play-test after every feature. | A play-test pasted into the console by hand, covering 7 of 12 jobs, written late. | **Missed.** Fixed now: `npm test`. |
+| Check at phone size as well as desktop, every time. | Checked the game once at phone width, never the launcher. | **Missed.** A player found a broken title and a missing pig on a phone. Fixed, and `npm test` now loads both pages at both sizes. |
+| Commit often from the start. | Version control began when the game was nearly done. | **Missed.** Step 3 of the route. |
+| Keep a short build log as you go. | This playbook was written afterwards, from memory of the session. | **Missed.** It cost accuracy: two claims in the first draft were wrong. |
+| Base every progress report on evidence. | Screenshots and measurements, mostly; the play-test was once described as covering everything. | Partly. |
+| Say what must not be done without asking (spend, publish). | Publishing waited for a "push" each time. | Matched. |
+| Explain why a thing matters, not only what to do. | The prompts were bare requests. | Not tried. Worth trying on the next game. |
+
+Two things the sources agree on and this project confirms: the agent's own play-testing finds
+real phone bugs when it is made routine (Willison's run found two; the routine added here found
+the launcher's pig hiding behind its own title), and none of it tells you whether the game is
+good. Willison judged his result a strong start and not a good game. That judgement still needs
+a person.
+
+A prompt for the next game, built from the above:
+
+> Build a small 3D browser game about [premise]. The player [sees, does, wins by]. It must work
+> on a phone with touch and on a desktop with keys. Make every asset yourself. Start with the
+> smallest version that can be won, commit it, then grow it. Add test hooks and a single command
+> that plays the whole game at desktop and phone size and fails on any error; run it after every
+> feature and keep it passing. Look at a screenshot after every visual change. Commit after each
+> working step and keep a short log of what you built, what broke and what you checked. Work on
+> your own; ask before publishing or spending anything.
+
+Sources:
+
+- [Prompting best practices, Anthropic](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [One-shotting a Raccoon Heist game using Claude Fable 5, Simon Willison](https://simonwillison.net/2026/aug/5/raccoon-heist/)
+- [Prompting for Claude Fable 5: a summary for game engineers, Izu](https://note.com/game_pg_izu/n/n41f7af063ed4?hl=en)
+- [Fable 5.2: five things you can build in one prompt, Abhijay Vuyyuru](https://abhijayvuyyuru.substack.com/p/fable-52-five-insane-things-you-can)
