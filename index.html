@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>When Pigs Fly — an improbability game</title>
-<meta name="description" content="You are a pig. The odds of you flying are 1 in 3,720,000. Do five impossible things and change them.">
+<title>When Pigs Fly</title>
+<meta name="description" content="A five-minute browser game. You are a pig on an island where every figure of speech is literally true. Work out five of them and you get wings.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐷</text></svg>">
 <link rel="stylesheet" href="landing.css">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
@@ -15,165 +15,94 @@
   <canvas id="hero"></canvas>
   <nav>
     <span class="logo display">WPF</span>
-    <a href="#feats">The feats</a>
-    <a href="#how">How it works</a>
-    <a href="#press">Press</a>
     <a class="btn small display" href="play.html">Play</a>
   </nav>
   <div class="hero-copy">
-    <p class="eyebrow">A browser game about very long odds</p>
     <h1 class="display">When <br>Pigs <br>Fly</h1>
-    <p class="lede">You are a pig. Do five impossible things, grow a pair of wings, and get over the moon.</p>
+    <p class="lede">You're a pig on an island where every figure of speech is literally true. Work out five of them and your wings grow big enough to reach the moon.</p>
     <div class="cta">
       <a class="btn big display" id="play" href="play.html">Play now</a>
-      <span class="free">Free. In your browser. No install.</span>
+      <span class="free">Free, runs in this tab, takes about five minutes.</span>
     </div>
     <div class="odds panel">
-      <span>Current odds of a pig flying</span>
+      <span>Odds of a pig flying right now</span>
       <b id="odds">1 in 3,720,000</b>
     </div>
     <p class="best" id="best" hidden></p>
   </div>
-  <div class="scroll-hint">scroll for the impossible ↓</div>
 </header>
 
-<div class="ticker" aria-hidden="true"><div class="ticker-track" id="ticker"></div></div>
-
 <main>
-  <section id="feats">
-    <h2 class="display">Twelve impossible things. Five at a time.</h2>
-    <p class="sub">Every idiom on the island is a job, and each game asks for a different five. The afternoon wears on as you go, a lighthouse comes on at dusk, the island keeps fifteen secrets, and everything answers back if you oink at it. Finish one and the odds drop, the meter climbs, and your wings get a size bigger.</p>
-    <div class="cards">
-      <article class="card panel" style="--tilt:-1.2deg">
-        <span class="num display">1</span>
-        <h3 class="display">A needle in a haystack</h3>
-        <p>Six haystacks. One needle. Root through them with your face. It will be in the last one you check, because it always is.</p>
-      </article>
-      <article class="card panel" style="--tilt:1deg">
-        <span class="num display">2</span>
-        <h3 class="display">Four four-leaf clovers</h3>
-        <p>One would be lucky. Four is a statistical incident. They are hiding at the far edges of the island.</p>
-      </article>
-      <article class="card panel" style="--tilt:-0.6deg">
-        <span class="num display">3</span>
-        <h3 class="display">Lightning strikes twice</h3>
-        <p>Climb the hill. Stand by the rod. Get struck. Then stay exactly where you are, since it never happens twice.</p>
-      </article>
-      <article class="card panel" style="--tilt:1.4deg">
-        <span class="num display">4</span>
-        <h3 class="display">A snowball's chance in hell</h3>
-        <p>There is a snowball. There is a pit of lava with a population of zero. Give the snowball its chance.</p>
-      </article>
-      <article class="card panel" style="--tilt:-1deg">
-        <span class="num display">5</span>
-        <h3 class="display">Till the cows come home</h3>
-        <p>Two cows, both out. Nobody is going to wait for them, so herd them into the pen yourself.</p>
-      </article>
-      <article class="card panel" style="--tilt:-0.8deg">
-        <span class="num display">6</span>
-        <h3 class="display">Blood from a stone</h3>
-        <p>There is a stone. It contains no blood. Take a run at it anyway, and then another.</p>
-      </article>
-      <article class="card panel" style="--tilt:1.2deg">
-        <span class="num display">7</span>
-        <h3 class="display">Hen's teeth</h3>
-        <p>Rare, they say. Three hens, one coop, and exactly one full set of teeth. Catch them and check.</p>
-      </article>
-      <article class="card panel" style="--tilt:-1.4deg">
-        <span class="num display">8</span>
-        <h3 class="display">An old dog, new tricks</h3>
-        <p>He has seen it all and learned none of it. Hop, oink and spin until he does it too.</p>
-      </article>
-      <article class="card panel" style="--tilt:0.7deg">
-        <span class="num display">9</span>
-        <h3 class="display">Herding cats</h3>
-        <p>Three cats and one cushion. They will go anywhere except where you want. Want it harder.</p>
-      </article>
-      <article class="card panel" style="--tilt:-0.5deg">
-        <span class="num display">10</span>
-        <h3 class="display">The end of the rainbow</h3>
-        <p>It moves when you get there. Then it moves again. It cannot keep that up for ever.</p>
-      </article>
-      <article class="card panel" style="--tilt:1.1deg">
-        <span class="num display">11</span>
-        <h3 class="display">A watched pot</h3>
-        <p>It never boils. Stand still, stare at it, and do not look away. See who cracks first.</p>
-      </article>
-      <article class="card panel" style="--tilt:-1.1deg">
-        <span class="num display">12</span>
-        <h3 class="display">A square peg, a round hole</h3>
-        <p>One crate, one hole, two shapes. Push until geometry gives up.</p>
-      </article>
-      <article class="card panel moon" style="--tilt:0.8deg">
-        <span class="num display">☾</span>
-        <h3 class="display">Once in a blue moon</h3>
-        <p>Do your five and the moon turns blue. Take off, follow the rings, and go over the top of it. The barn is locked, by the way. Ask the horse.</p>
-      </article>
+  <section id="signs">
+    <h2 class="display">The signs are all the help you get.</h2>
+    <p class="sub">The island has twelve idioms on it and each run hands you five, a different five every time. You'll know what the saying is. Working out how a pig actually does it is the game. These three are standing on the island right now.</p>
+    <div class="signs">
+      <div class="sign" style="--tilt:-2deg"><b class="display">Hell</b><span>pop. 0 · no snowballs</span></div>
+      <div class="sign" style="--tilt:1.5deg"><b class="display">The stone</b><span>Contains no blood</span></div>
+      <div class="sign" style="--tilt:-1deg"><b class="display">Old dog</b><span>Knows no new tricks</span></div>
     </div>
   </section>
 
-  <section id="how" class="how">
-    <h2 class="display">How a pig gets airborne</h2>
+  <section id="wings" class="how">
+    <h2 class="display">Every one you solve grows your wings.</h2>
+    <p class="sub">The odds are stacked against you in a way you can feel. At the start, hens wriggle out of your grip three times in four and a snowball lasts three and a half seconds near the lava. Each job you finish loads the dice a little, so the order you do them in matters.</p>
     <div class="steps">
       <div class="step">
         <div class="wing" style="--s:.3"><i></i><i></i></div>
-        <h3 class="display">0 feats</h3>
-        <p>A hop. Two decorative nubs. Gravity is winning.</p>
+        <h3 class="display">Nothing solved</h3>
+        <p>You can hop. That's it.</p>
       </div>
       <div class="step">
         <div class="wing" style="--s:.55"><i></i><i></i></div>
-        <h3 class="display">2 feats</h3>
-        <p>Two flaps in mid-air and a glide. Trees become optional.</p>
+        <h3 class="display">Two</h3>
+        <p>Two flaps in mid-air, then a glide.</p>
       </div>
       <div class="step">
         <div class="wing" style="--s:.8"><i></i><i></i></div>
-        <h3 class="display">4 feats</h3>
-        <p>Four flaps. You can clear the barn. The cows have questions.</p>
+        <h3 class="display">Four</h3>
+        <p>Four flaps, which gets you onto the barn roof.</p>
       </div>
       <div class="step">
         <div class="wing" style="--s:1"><i></i><i></i></div>
-        <h3 class="display">5 feats</h3>
-        <p>Hold the button and fly. All of it. Up to the moon.</p>
+        <h3 class="display">Five</h3>
+        <p>The moon turns blue and you can fly for real.</p>
       </div>
-    </div>
-    <div class="controls panel">
-      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>trot about</span></div>
-      <div><kbd class="wide">Space</kbd><span>hop, flap, hold to glide</span></div>
-      <div><kbd class="wide">Shift</kbd><span>trot faster</span></div>
-      <div><kbd>V</kbd><span>pig's-eye view</span></div>
-      <div><kbd>E</kbd><span>oink</span></div>
-      <div><kbd>📱</kbd><span>drag to steer, tap FLAP</span></div>
     </div>
   </section>
 
   <section class="poster">
     <figure>
       <img src="keyart.jpg" alt="Seen from behind, a pink pig with feathered wings flies at twilight toward a glowing blue moon ringed with gold hoops. Below it is a small farm island with a red barn, a windmill and a striped lighthouse, under a starry sky." width="1920" height="1080" loading="lazy">
-      <figcaption><span class="display">Once in a blue moon.</span> <a class="btn small display" href="play.html">Go over it</a></figcaption>
     </figure>
-  </section>
-
-  <section id="press" class="press">
-    <h2 class="display">What the island is saying</h2>
-    <div class="quotes">
-      <blockquote class="panel"><p>“Udderly implausible.”</p><cite>A cow, on her way home</cite></blockquote>
-      <blockquote class="panel"><p>“I hit that pig twice. I'd do it again, which I'm told I can't.”</p><cite>The lightning</cite></blockquote>
-      <blockquote class="panel"><p>“Cold.”</p><cite>Hell</cite></blockquote>
-      <blockquote class="panel"><p>“Finally, some recognition.”</p><cite>The needle</cite></blockquote>
+    <div class="secrets">
+      <h2 class="display">And fifteen secrets that aren't on any list.</h2>
+      <p class="sub">Finishing takes five minutes. Finding everything takes a lot longer, and the game ranks you on it, from Ham-ateur up to The Whole Hog. The barn is locked. The horse knows something. Past that, all you get from us is rumours:</p>
+      <ul class="rumours">
+        <li>a sack that oinks back</li>
+        <li>a fight with a building</li>
+        <li>what the moon tastes of</li>
+      </ul>
     </div>
-    <p class="fine">Reviews are from residents of the island and are made up, like the island.</p>
   </section>
 
   <section class="final">
-    <h2 class="display">The odds won't beat themselves.</h2>
+    <h2 class="display">Go on, then.</h2>
     <a class="btn big display" href="play.html">Play When Pigs Fly</a>
-    <p class="fine">Takes about five minutes. Runs on a laptop or a phone. Sound is recommended; oinking is optional.</p>
+    <div class="controls panel">
+      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>move</span></div>
+      <div><kbd class="wide">Space</kbd><span>hop, flap, hold to glide</span></div>
+      <div><kbd class="wide">Shift</kbd><span>run</span></div>
+      <div><kbd>E</kbd><span>oink at things</span></div>
+      <div><kbd>V</kbd><span>pig's-eye view</span></div>
+      <div><kbd>📱</kbd><span>drag to steer, tap FLAP</span></div>
+    </div>
+    <p class="fine">Works on a laptop or a phone. Better with the sound on.</p>
   </section>
 </main>
 
 <footer>
-  <span>When Pigs Fly · built with Three.js · every sound is synthesised, every pig is procedural</span>
-  <span>No pigs were launched in the making of this game.</span>
+  <span>No engine and no build step: about 2,900 lines of JavaScript on three.js, a Blender-baked island, and every sound synthesised in the browser.</span>
+  <a href="https://github.com/SusannaRemec/when-pigs-fly">Read the source</a>
 </footer>
 
 <script type="module" src="landing.js"></script>

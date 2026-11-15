@@ -22,16 +22,8 @@ const best = parseFloat(localStorage.getItem('wpf-best') || '0');
 if (best > 0) {
   const el = document.getElementById('best');
   el.hidden = false;
-  el.textContent = `Your record: over the moon in ${Math.floor(best / 60)}:${String(Math.floor(best % 60)).padStart(2, '0')}. Beat it.`;
+  el.textContent = `Your best: over the moon in ${Math.floor(best / 60)}:${String(Math.floor(best % 60)).padStart(2, '0')}.`;
 }
-
-// ---------- ticker
-const lines = [
-  'Odds of a pig flying: <b>1 in 3,720,000</b>', 'Hell: <b>still warm</b>', 'Cows: <b>not home</b>', 'Lightning strikes on this pig: <b>0</b>',
-  'Needles located: <b>0</b>', 'Moon colour: <b>the usual</b>', 'Four-leaf clovers: <b>pending</b>', 'Snowball outlook: <b>slim</b>',
-];
-const track = document.getElementById('ticker');
-track.innerHTML = [...lines, ...lines].map((l) => `<span>${l}</span><span>✦</span>`).join('');
 
 // ---------- hero scene
 const canvas = document.getElementById('hero');
