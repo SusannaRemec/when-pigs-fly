@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Sound check</title>
+<!-- Renders every sound effect and a stretch of each music arrangement offline and measures it:
+     peak, loudness (RMS of the loudest half second), how long it lasts, and roughly where its
+     pitch sits. Open http://localhost:4173/tools/sound-check.html; results are in window.report. -->
+<pre id="out">measuring…</pre>
+<script type="module">
+import { Sfx } from '../src/audio.js';
+const SR = 44100, db = (v) => (v > 0 ? 20 * Math.log10(v) : -120).toFixed(1);
+async function measure(seconds, play) {
+  const ctx = new OfflineAudioContext(1, SR * seconds, SR), s = new Sfx();
+  s.init(ctx);
+  play(s);
+  const d = (await ctx.startRendering()).getChannelData(0);
+  let peak = 0, best = 0, zc = 0, last = 0, first = -1;
+  const win = SR / 2;
+  let acc = 0;
+  for (let i = 0; i < d.length; i++) {
+    const v = Math.abs(d[i]);
+    if (v > peak) peak = v;
+    if (v > 0.003) { last = i; if (first < 0) first = i; }
+    acc += d[i] * d[i];
+    if (i >= win) acc -= d[i - win] * d[i - win];
+    if (acc > best) best = acc;
+    if (i && (d[i] >= 0) !== (d[i - 1] >= 0)) zc++;
+  }
+  return { peak: db(peak), loud: db(Math.sqrt(best / win)), secs: ((last - Math.max(first, 0)) / SR).toFixed(2), zeroCrossHz: Math.round(zc / 2 / Math.max(0.05, (last - first) / SR)), clipped: peak >= 0.999 };
+}
+const fx = ['oink', 'muffled', 'flap', 'hop', 'thud', 'splash', 'moo', 'bark', 'meow', 'cluck', 'neigh', 'trumpet', 'chime', 'rustle', 'creak', 'clank', 'hiss', 'thunder', 'feat', 'win'];
+const report = {};
+for (const name of fx) report[name] = await measure(4, (s) => s[name]());
+report.hoof = await measure(1, (s) => s.hoof(true, true));
+report.ring3 = await measure(2, (s) => s.ring(3));
+const band = (level, dream, won) => (s) => { s.setProgress(level, dream, won); s.stepLen = dream ? 0.3 : 0.2; for (let i = 0; i < 64; i++) s.playStep(i, 0.1 + i * s.stepLen); };
+report['music level 0'] = await measure(14, band(0));
+report['music level 2'] = await measure(14, band(2));
+report['music level 4'] = await measure(14, band(4));
+report['music finale'] = await measure(20, band(5, true));
+report['music won'] = await measure(14, band(5, false, true));
+report['worst case: thunder + feat + music'] = await measure(6, (s) => { band(4)(s); s.thunder(); s.feat(); s.oink(); });
+window.report = report;
+document.getElementById('out').textContent = Object.entries(report).map(([k, v]) => `${k.padEnd(36)} peak ${v.peak.padStart(6)} dB  loud ${v.loud.padStart(6)} dB  ${v.secs}s  ~${v.zeroCrossHz} Hz${v.clipped ? '  CLIPPED' : ''}`).join('\n');
+</script>

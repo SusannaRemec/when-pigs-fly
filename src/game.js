@@ -430,6 +430,7 @@ function refreshHud() {
   const odds = [3720000, 172000, 8100, 370, 19, 1][count];
   $('oddsN').textContent = won ? 'certain' : '1 in ' + odds.toLocaleString('en-US');
   $('oddsNote').textContent = won ? 'Physics has left the building.' : ['About as likely as a polite seagull.', 'Slightly likelier than matching socks.', 'Roughly a cat coming when called.', 'On a par with a short meeting.', 'Bookmakers have stopped answering the phone.', 'There is a moon in the way. Go over it.'][count];
+  sfx.setProgress(count, finale, won);
   if (count) { $('meter').classList.remove('pop'); void $('meter').offsetWidth; $('meter').classList.add('pop'); }
   document.querySelectorAll('#feats li').forEach((li) => {
     const k = li.dataset.k;
@@ -832,7 +833,7 @@ function oinkReact() {
 }
 const IDLE_LINES = ['The pig is waiting for the cows to come home.', 'Somewhere, a pot is not being watched.', 'The odds are not improving on their own.', 'A lovely spot to do nothing. Carry on.', 'The pig considers its options. There are five.'];
 const TREE_LINES = ['The tree wins again.', 'Trees do not move. This is well documented.', 'That one was not the right tree either.'];
-let idleT = 0, idleN = 0, fieldT = 0, dustT = 0;
+let idleT = 0, idleN = 0, fieldT = 0, dustT = 0, hoofT = 0, hoofB = false, wasWading = false;
 
 // ---------------------------------------------------------------- dusk, and small living things
 // The afternoon wears on with every job done; the last one brings the blue moon up over twilight.
@@ -1718,6 +1719,19 @@ function updateFeats(dt) {
     // trotting kicks up dust; the sea is a bath
     dustT -= dt;
     const wading = pos.y < WATER_Y - 0.05;
+    if (wading !== wasWading) { wasWading = wading; sfx.splash(); }
+    if (grounded && Math.abs(speed) > 1.5 && !wading) { // clip-clop
+      hoofT -= Math.abs(speed) * dt;
+      if (hoofT <= 0) { hoofT += speed > 10 ? 2.1 : 1.5; hoofB = !hoofB; sfx.hoof(hoofB, speed > 10); }
+    }
+    sfx.ambience(dt, {
+      shore: clamp(1 - Math.abs(offshore(pos.x, pos.z) + 2) / 16, 0, 1) * clamp(1 - (pos.y - 4) / 40, 0.25, 1),
+      wind: grounded ? 0 : clamp(Math.abs(speed) / 22 + Math.abs(vy) / 30 + pos.y / 160, 0, 1),
+      fire: clamp(1 - hd(P.camp.x, P.camp.z) / 13, 0, 1),
+      lava: pit.frozen ? 0 : clamp(1 - hd(pit.x, pit.z) / 16, 0, 1),
+      night: clamp((mood - 0.5) / 0.4, 0, 1),
+      meadow: clamp(1 - pos.y / 30, 0, 1) * (inBarn() ? 0.2 : 1),
+    });
     if (wading && Math.abs(speed) > 1 && dustT <= 0) { dustT = 0.1; burst(new THREE.Vector3(pos.x, WATER_Y + 0.1, pos.z), 0xffffff, 2, 3, 9, 0.8); }
     else if (grounded && speed > 10.5 && dustT <= 0) { dustT = 0.11; burst(new THREE.Vector3(pos.x - Math.sin(yaw) * 1.1, pos.y + 0.15, pos.z - Math.cos(yaw) * 1.1), 0xe0d2ae, 1, 1.2, 1.5, 1.1); }
     if (wading) { if (!found.wash) soot = 0; secret('wash', 'Hogwash. You are now a slightly cleaner pig.'); }
