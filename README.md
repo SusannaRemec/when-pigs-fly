@@ -11,7 +11,8 @@ On a phone, drag to steer and use the FLAP and OINK buttons.
 
 **Stuck?** The small "stuck?" link (bottom left on a phone) puts the pig back where it was a
 few seconds earlier and saves a report of the last ten seconds: positions, speeds, what it bumped
-into and what the controls were doing. Nothing is sent anywhere. On a phone the share sheet opens
+into, what the controls were doing, any errors the game threw and whether the browser took the
+picture away. Nothing is sent anywhere. On a phone the share sheet opens
 so you can pass the report on; elsewhere it is copied to the clipboard. The last three reports
 stay in the browser under `wpf-stuck`.
 

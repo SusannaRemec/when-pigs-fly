@@ -1038,7 +1038,7 @@ const touch = { id: null, ox: 0, oy: 0, turn: 0, fwd: 0 };
 
 // Flight recorder: the last ten seconds of the pig, kept in this browser, for working out how
 // someone got stuck. The "stuck?" button frees the pig and offers the report to share.
-const BUILD = '2026-11-14b';
+const BUILD = '2026-11-14c';
 const stuckBtn = $('stuckBtn'); // absent if a phone is still holding an older copy of the page
 const tele = createRecorder({
   build: BUILD,
@@ -1046,10 +1046,23 @@ const tele = createRecorder({
     seed, active: active.join(), done: Object.keys(feats).filter((k) => feats[k]).join(), count, finale, won, time: Math.round(time),
     pig: { x: +pos.x.toFixed(2), y: +pos.y.toFixed(2), z: +pos.z.toFixed(2), yaw: +yaw.toFixed(2), speed: +speed.toFixed(2), vy: +vy.toFixed(2), grounded, ground: +standY(pos.x, pos.z).toFixed(2), inBarn: inBarn(), offshore: +offshore(pos.x, pos.z).toFixed(1) },
     input: { touch: { ...touch }, keys: Object.keys(keys).filter((k) => keys[k]).join(), holdFlap, firstPerson },
-    screen: { w: innerWidth, h: innerHeight, dpr: devicePixelRatio, slowStep, ua: navigator.userAgent },
+    screen: { w: innerWidth, h: innerHeight, dpr: devicePixelRatio, slowStep, pictureLost, pictureGone: renderer.getContext().isContextLost(), ua: navigator.userAgent },
   }),
   onStuck() { stuckBtn?.classList.add('on'); },
 });
+addEventListener('error', (e) => { if (tele.error('page', e.error || e.message)) stuckBtn?.classList.add('on'); });
+addEventListener('unhandledrejection', (e) => tele.error('promise', e.reason));
+document.addEventListener('visibilitychange', () => tele.note(document.hidden ? 'hidden' : 'shown'));
+// A phone short of graphics memory takes the picture away; the game carries on unseen, which
+// looks like being stuck. Say so, since nothing in the game can bring it back but the browser.
+let pictureLost = 0;
+canvas.addEventListener('webglcontextlost', () => {
+  pictureLost++; tele.note('picture lost');
+  stuckBtn?.classList.add('on');
+  toastEl.textContent = 'The picture has stopped: this device ran short of graphics memory. Tap "stuck?" to save a report, then reload the page.';
+  toastEl.classList.add('show'); toastT = 600;
+});
+canvas.addEventListener('webglcontextrestored', () => { tele.note('picture restored'); say('The picture is back.', 3); });
 stuckBtn?.addEventListener('click', (e) => {
   e.preventDefault();
   const rep = tele.manual();
@@ -1221,7 +1234,7 @@ function updatePig(dt) {
   pig.group.rotation.z += (bank - pig.group.rotation.z) * Math.min(1, dt * 5);
   pig.update(dt, { speed: Math.abs(speed), airborne: !grounded, t: time });
   tele.tick(dt, { x: pos.x, y: pos.y, z: pos.z, yaw, speed, vy, grounded, ground: gy, fwd, turn });
-  if (!tele.stuck) stuckBtn?.classList.remove('on');
+  if (!tele.stuck && !pictureLost && !tele.faults) stuckBtn?.classList.remove('on');
 }
 
 const nearGround = () => pos.y - standY(pos.x, pos.z) < 2.5;
@@ -1909,8 +1922,8 @@ function frame(now) {
     if (slowStep++ === 0) { renderer.setPixelRatio(1); composer.setPixelRatio(1); resize(); } else bloom.enabled = false;
   }
   if (slowT > 0) { slowT -= dt; dt *= 0.35; } // a held breath when something impossible happens
-  step(dt);
-  composer.render();
+  // One bad frame must not stop every frame after it: note it, light the stuck button, carry on.
+  try { step(dt); composer.render(); } catch (e) { if (tele.error('frame', e)) { console.error(e); stuckBtn?.classList.add('on'); } }
   requestAnimationFrame(frame);
 }
 function step(dt) {

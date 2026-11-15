@@ -1,6 +1,7 @@
 // A flight recorder for the pig. It keeps the last ten seconds of what the game was doing and
 // notices when the pig is being pushed but is not going anywhere (which is also what leaning on
-// a wall looks like, so noticing only lights the button up; it does not interrupt). Nothing is sent anywhere: a
+// a wall looks like, so noticing only lights the button up; it does not interrupt). It also
+// keeps any errors the game threw and whether the browser took the picture away. Nothing is sent anywhere: a
 // report stays in this browser (localStorage 'wpf-stuck') until the player chooses to share it.
 // No three.js in here, so it can be run and tested in Node.
 
@@ -13,7 +14,7 @@ const r1 = (v) => Math.round(v * 10) / 10;
 const r2 = (v) => Math.round(v * 100) / 100;
 
 export function createRecorder({ build = '', context = () => ({}), onStuck = () => {} } = {}) {
-  const samples = [], events = [];
+  const samples = [], events = [], errors = [];
   let t = 0, acc = 0, hits = new Set(), worstDt = 0;
   let pushT = 0, anchor = null, stuck = false, lastFree = null, onset = null;
 
@@ -56,8 +57,18 @@ export function createRecorder({ build = '', context = () => ({}), onStuck = () 
     }
   }
 
+  // Something threw. The same message again only raises its count, so a fault in every frame stays one line.
+  function error(where, e) {
+    const msg = `${where}: ${e && e.message ? e.message : e}`;
+    const seen = errors.find((x) => x.msg === msg);
+    if (seen) { seen.n++; return false; }
+    if (errors.length < 8) errors.push({ t: r2(t), msg, n: 1, stack: String((e && e.stack) || '').split('\n').slice(0, 5).map((l) => l.trim().replace(/https?:\/\/[^/]+\//, '')).join(' < ') });
+    note('error', msg);
+    return true;
+  }
+
   function report(why) {
-    return { why, build, at: new Date().toISOString(), ...context(), lastFree: lastFree && { x: r1(lastFree.x), z: r1(lastFree.z), secondsAgo: r1(t - lastFree.t) }, events: [...events], samples: [...samples] };
+    return { why, build, at: new Date().toISOString(), ...context(), lastFree: lastFree && { x: r1(lastFree.x), z: r1(lastFree.z), secondsAgo: r1(t - lastFree.t) }, errors: errors.map((x) => ({ ...x })), events: [...events], samples: [...samples] };
   }
 
   function save(rep) {
@@ -70,11 +81,12 @@ export function createRecorder({ build = '', context = () => ({}), onStuck = () 
   }
 
   return {
-    tick, note, report,
+    tick, note, report, error,
     hit(kind) { hits.add(kind || 'boulder'); },
     // The player says they are stuck, whether or not the recorder noticed.
     manual() { note('reported'); return save({ ...report(stuck ? 'pushing, not moving (reported)' : 'reported by player'), onset }); },
     get stuck() { return stuck; },
+    get faults() { return errors.length; },
     // Somewhere the pig stood a little while ago, at least `far` away from where it is now.
     escape(x, z, far = 6) {
       for (let i = samples.length - 1; i >= 0; i--) { const q = samples[i]; if (q.g && Math.hypot(q.x - x, q.z - z) > far) return { x: q.x, z: q.z }; }
