@@ -28,6 +28,8 @@ stay in the browser under `wpf-stuck`.
 - Three.js, no build step. The game is `src/game.js`; the launcher page is `index.html`.
 - The island and the animals are modelled and light-baked in headless Blender:
   `npm run bake` (about two minutes) and `npm run bake:critters`.
+- `src/odds.js` is how often things go wrong, by jobs finished: hens slipping free, the snowball
+  melting near the pit. The numbers to tune are at the top of it.
 - `src/move.js` is how the pig moves and `src/telemetry.js` is the stuck recorder. Neither uses
   three.js, so the tests run the same code the game does.
 - `src/layout.js` holds the island's shape and where everything is. The game reads it for

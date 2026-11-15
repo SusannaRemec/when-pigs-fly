@@ -108,8 +108,8 @@ async function game(name, viewport, feats, partNos, expect) {
   noFaults(name);
 }
 
-const NEWER_EXPECT = { stone: true, hens: true, dog: true, cats: true, pot: true, finale: true, count: 5, rainbow: true, peg: true, barnOpen: true, inBarn: true, foundN: (n) => n >= 13 };
-const FIRST_EXPECT = { needle: true, clover: true, lightning: true, hell: true, cows: true, count: 5, finale: true, rings: 7, won: true, winScreen: true, cheese: true, fish: true, errors: 0 };
+const NEWER_EXPECT = { stone: true, hens: true, henSlipped: true, dog: true, cats: true, pot: true, finale: true, count: 5, rainbow: true, peg: true, barnOpen: true, inBarn: true, foundN: (n) => n >= 13 };
+const FIRST_EXPECT = { luckStart: 'Things go wrong 3 times in 4.', melted: true, melts: 1, luckEnd: '', needle: true, clover: true, lightning: true, hell: true, cows: true, count: 5, finale: true, rings: 7, won: true, winScreen: true, cheese: true, fish: true, errors: 0 };
 try {
   await launcher('launcher-desktop', DESKTOP);
   await launcher('launcher-phone', PHONE);

@@ -9,6 +9,7 @@ import { P, SUN_DIR, WATER_Y, groundY, standY, makeRnd, buildColliders, CLOVERS,
 import { loadCritters, pose } from './critters.js';
 import { createPig } from './pig.js';
 import { Sfx } from './audio.js';
+import { HEAT_R, slipChance, slipWords, meltSeconds, makeDice } from './odds.js';
 import { createRecorder } from './telemetry.js';
 import { steer, fall, contain, collide, land } from './move.js';
 
@@ -55,6 +56,7 @@ const SUN = new THREE.Vector3(...SUN_DIR).normalize();
 const params = new URLSearchParams(location.search);
 const seed = params.has('seed') ? parseInt(params.get('seed'), 10) || 1 : (Math.random() * 2 ** 31) | 0;
 const draw = makeRnd(seed);
+const dice = makeDice(makeRnd(seed ^ 0x5eed)); // its own stream, so rolling it never changes the draw
 const shuffled = (list) => {
   const a = [...list];
   for (let i = a.length - 1; i > 0; i--) { const j = (draw() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; }
@@ -439,6 +441,7 @@ function say(text, dur = 4.5) {
 }
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
+const luckEl = $('luck'); // missing on a page cached from before it existed
 function refreshHud() {
   const pct = count * 20;
   $('fill').style.width = pct + '%';
@@ -446,6 +449,7 @@ function refreshHud() {
   const odds = [3720000, 172000, 8100, 370, 19, 1][count];
   $('oddsN').textContent = won ? 'certain' : '1 in ' + odds.toLocaleString('en-US');
   $('oddsNote').textContent = won ? 'Physics has left the building.' : ['About as likely as a polite seagull.', 'Slightly likelier than matching socks.', 'Roughly a cat coming when called.', 'On a par with a short meeting.', 'Bookmakers have stopped answering the phone.', 'There is a moon in the way. Go over it.'][count];
+  if (luckEl) luckEl.textContent = finale ? '' : count >= 4 ? 'Nothing goes wrong any more.' : `Things go wrong ${slipWords(count)}.`;
   sfx.setProgress(count, finale, won);
   if (count) { $('meter').classList.remove('pop'); void $('meter').offsetWidth; $('meter').classList.add('pop'); }
   document.querySelectorAll('#feats li').forEach((li) => {
@@ -478,6 +482,14 @@ function complete(key, line) {
     later(3.6, startFinale);
   }
   refreshHud();
+}
+
+// Something went wrong because the odds are still long. The first time, say what shortens them.
+function mishap(kind, line) {
+  stats[kind]++;
+  tele.note('mishap', kind);
+  say(stats.slips + stats.melts === 1 ? `${line} Finish any job and the dice get kinder.` : line, 4.2);
+  if (luckEl) { luckEl.classList.remove('pop'); void luckEl.offsetWidth; luckEl.classList.add('pop'); }
 }
 
 // ---------------------------------------------------------------- feat 1: needle in a haystack
@@ -591,7 +603,7 @@ for (let i = 0; i < 15; i++) {
 }
 makeSign(['HELL', 'pop. 0  ·  no snowballs'], pit.x - 8, pit.z - 4, -1.1);
 const pitBeacon = beacon('hell', 0xff7a3a, pit.x, pit.z);
-const ball = { x: P.snow.x, z: P.snow.z, vx: 0, vz: 0, r: 1.3, gone: false, sink: 0 };
+const ball = { x: P.snow.x, z: P.snow.z, vx: 0, vz: 0, r: 1.3, gone: false, sink: 0, melt: 0 };
 const ballMesh = mesh(new THREE.IcosahedronGeometry(ball.r, 2), std(0xffffff, { roughness: 0.6, flatShading: true }));
 makeSign(['SNOWBALL', 'Chance: slim'], P.snow.x + 4, P.snow.z - 5, -0.6);
 const ballBeacon = beacon('hell', 0xcfefff, ball.x, ball.z);
@@ -632,7 +644,7 @@ function bounceOff() {
 const hens = HEN_STARTS.map((s, i) => {
   const cr = critters.make('hen');
   scene.add(cr.group);
-  return { cr, x: s.x, z: s.z, heading: draw() * 6.28, phase: i * 2.1, moving: 0, wanderT: 0, idle: true, caught: false, hop: 0 };
+  return { cr, x: s.x, z: s.z, heading: draw() * 6.28, phase: i * 2.1, moving: 0, wanderT: 0, idle: true, caught: false, hop: 0, slips: 0, dash: 0 };
 });
 const toothy = 2 + ((draw() * 2) | 0); // the second or the third hen caught is the one
 let hensCaught = 0;
@@ -828,7 +840,7 @@ const grinTex = (() => {
 const moonCow = { cr: null, a: -0.6 };
 
 // ---------------------------------------------------------------- oinking at things
-const stats = { oinks: 0, trees: 0, rides: 0 };
+const stats = { oinks: 0, trees: 0, rides: 0, slips: 0, melts: 0 };
 const quip = (text, dur = 3.2) => { if (toastT <= 0.3) say(text, dur); };
 const hopOf = (o, dt, h = 1) => { o.hop = Math.max(0, (o.hop || 0) - dt * 1.9); return Math.sin(o.hop * Math.PI) * h; };
 function oinkReact() {
@@ -1053,7 +1065,7 @@ const touch = { id: null, ox: 0, oy: 0, turn: 0, fwd: 0 };
 
 // Flight recorder: the last ten seconds of the pig, kept in this browser, for working out how
 // someone got stuck. The "stuck?" button frees the pig and offers the report to share.
-const BUILD = '2026-11-14c';
+const BUILD = '2026-11-14d';
 const stuckBtn = $('stuckBtn'); // absent if a phone is still holding an older copy of the page
 const tele = createRecorder({
   build: BUILD,
@@ -1277,7 +1289,19 @@ function updateFeats(dt) {
 
   // snowball and hell
   if (!ball.gone) {
-    const dx = ball.x - pos.x, dz = ball.z - pos.z, d = Math.hypot(dx, dz), min = ball.r + 1.0;
+    // Near the pit it melts, quickly while the odds are long. Out in the cold it grows back.
+    const heat = Math.hypot(ball.x - pit.x, ball.z - pit.z) < HEAT_R;
+    ball.melt = clamp(ball.melt + (heat ? dt / meltSeconds(count) : -dt * 0.25), 0, 1);
+    if (heat && Math.random() < dt * (4 + ball.melt * 14)) burst(new THREE.Vector3(ball.x, ballMesh.position.y + 0.6, ball.z), 0xffffff, 1, 1.2, -2.5, 0.8);
+    if (ball.melt >= 1) {
+      sfx.hiss();
+      burst(ballMesh.position, 0xffffff, 26, 4, -3, 1.6);
+      Object.assign(ball, { x: P.snow.x, z: P.snow.z, vx: 0, vz: 0, melt: 0 });
+      mishap('melts', count ? 'The snowball melted. There is another back in the snow, and it will last longer now.' : "The snowball melted. A snowball's chance, exactly as advertised. There is another back in the snow.");
+    }
+    const r = ball.r * (1 - ball.melt * 0.6);
+    ballMesh.scale.setScalar(r / ball.r);
+    const dx = ball.x - pos.x, dz = ball.z - pos.z, d = Math.hypot(dx, dz), min = r + 1.0;
     if (d < min && nearGround() && d > 0.001) {
       const push = Math.max(Math.abs(speed), 3) * 1.25;
       ball.vx = (dx / d) * push; ball.vz = (dz / d) * push;
@@ -1287,13 +1311,13 @@ function updateFeats(dt) {
     if (sp > 0.01) {
       ball.x += ball.vx * dt; ball.z += ball.vz * dt;
       const axis = new THREE.Vector3(ball.vz, 0, -ball.vx).normalize();
-      ballMesh.rotateOnWorldAxis(axis, (sp * dt) / ball.r);
+      ballMesh.rotateOnWorldAxis(axis, (sp * dt) / r);
       const k = Math.exp(-1.1 * dt);
       ball.vx *= k; ball.vz *= k;
     }
     const br = Math.hypot(ball.x, ball.z);
     if (br > 78) { ball.x *= 78 / br; ball.z *= 78 / br; ball.vx *= -0.6; ball.vz *= -0.6; }
-    ballMesh.position.set(ball.x, groundY(ball.x, ball.z) + ball.r, ball.z);
+    ballMesh.position.set(ball.x, groundY(ball.x, ball.z) + r, ball.z);
     ballBeacon.position.x = ball.x; ballBeacon.position.z = ball.z;
     if (Math.hypot(ball.x - pit.x, ball.z - pit.z) < pit.r - 0.3) {
       ball.gone = true; pit.frozen = true;
@@ -1305,7 +1329,7 @@ function updateFeats(dt) {
   } else if (ball.sink < 1) {
     ball.sink = Math.min(1, ball.sink + dt * 0.8);
     ballMesh.position.y -= dt * 1.6;
-    ballMesh.scale.setScalar(1 - ball.sink);
+    ballMesh.scale.setScalar((1 - ball.sink) * (1 - ball.melt * 0.6));
   }
   if (pit.frozen) {
     lavaMat.color.lerp(new THREE.Color(0xc9efff), dt * 2);
@@ -1414,7 +1438,16 @@ function updateFeats(dt) {
   for (const h of hens) {
     let mv = 0;
     const dx = h.x - pos.x, dz = h.z - pos.z, d = Math.hypot(dx, dz);
-    if (!h.caught && d < 1.7 && nearGround()) {
+    h.dash = Math.max(0, h.dash - dt);
+    if (!h.caught && !h.dash && d < 1.7 && nearGround() && dice.wrong(slipChance(count), h.slips)) {
+      // the odds are still long: she slips free and bolts
+      h.slips++; h.dash = 1.3; h.hop = 1; h.heading = Math.atan2(dx, dz);
+      sfx.cluck();
+      burst(new THREE.Vector3(h.x, pos.y + 1, h.z), 0xfff3c0, 16, 6, 8, 0.8);
+      mishap('slips', `She slipped free. Right now that happens ${slipWords(count)}.`);
+    } else if (h.dash) {
+      mv = 15;
+    } else if (!h.caught && d < 1.7 && nearGround()) {
       h.caught = true; h.hop = 1; hensCaught++;
       sfx.cluck();
       burst(new THREE.Vector3(h.x, pos.y + 1, h.z), 0xffffff, 10, 4, 7, 0.7);
@@ -1958,6 +1991,6 @@ window.__wpf = {
   teleport(x, y, z) { pos.set(x, y === null ? standY(x, z) : y, z); vy = 0; grounded = y === null; },
   face(a) { yaw = a; },
   view(...v) { debugCam = v.length === 6 ? v : null; },
-  keys, begin, step, groundY, tele, touch, ball, MOON_POS,
+  keys, begin, step, groundY, tele, touch, ball, MOON_POS, dice,
   press(code, on) { keys[code] = on; if (code === 'Space') { holdFlap = on; if (on) flapQueued = true; } },
 };

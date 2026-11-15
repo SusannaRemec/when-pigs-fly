@@ -21,9 +21,10 @@
   // hens: chase the nearest uncaught one on foot at a trot
   w.press('ShiftLeft', true); w.press('KeyW', true);
   w.teleport(P.coop.x + 6, null, P.coop.z + 6);
-  run(40, () => { const s = w.state; const h = w.hens.filter((h) => !h.caught).sort((a, b) => Math.hypot(a.x - s.x, a.z - s.z) - Math.hypot(b.x - s.x, b.z - s.z))[0]; if (h && !s.feats.hens) w.face(Math.atan2(h.x - s.x, h.z - s.z)); });
+  w.dice.fix = true; // the odds: the first hen touched slips free, and after that the dice are held kind
+  run(40, () => { if (w.stats.slips) w.dice.fix = false; const s = w.state; const h = w.hens.filter((h) => !h.caught).sort((a, b) => Math.hypot(a.x - s.x, a.z - s.z) - Math.hypot(b.x - s.x, b.z - s.z))[0]; if (h && !s.feats.hens) w.face(Math.atan2(h.x - s.x, h.z - s.z)); });
   w.press('ShiftLeft', false); w.press('KeyW', false); run(1);
-  log.hens = w.state.feats.hens; log.hensCaught = w.state.hensCaught; log.toothy = w.toothy;
+  log.hens = w.state.feats.hens; log.hensCaught = w.state.hensCaught; log.toothy = w.toothy; log.henSlipped = w.stats.slips === 1;
   // dog
   w.teleport(w.dog.x + 3, null, w.dog.z + 3); run(0.5);
   for (let i = 0; i < 3; i++) {
@@ -100,6 +101,10 @@
   const w = window.__wpf, P = w.places.P, log = {};
   const run = (sec, each) => { for (let t = 0; t < sec; t += 1 / 60) { if (each && each() === false) return; w.step(1 / 60); } };
   for (const k in w.keys) w.keys[k] = false;
+  // the odds: with no job done, a snowball left in the heat of the pit melts, and another turns up in the snow
+  log.luckStart = document.getElementById('luck').textContent;
+  w.teleport(0, null, 0); w.ball.x = w.places.pit.x + 8; w.ball.z = w.places.pit.z; run(4);
+  log.melted = w.stats.melts === 1 && Math.hypot(w.ball.x - P.snow.x, w.ball.z - P.snow.z) < 0.1;
   // needle: root through every haystack
   for (const s of w.places.stacks) { w.teleport(s.x + 1.5, null, s.z); run(0.3); }
   log.needle = w.state.feats.needle;
@@ -146,6 +151,7 @@
   w.teleport(w.MOON_POS.x, w.MOON_POS.y + 11, w.MOON_POS.z); run(0.1);
   w.teleport(P.pond.x + 3, null, P.pond.z); run(0.3);
   log.cheese = !!w.found.cheese; log.fish = !!w.found.fish;
+  log.luckEnd = document.getElementById('luck').textContent; log.melts = w.stats.melts;
   log.errors = w.tele.faults;
   return JSON.stringify(log);
 })()

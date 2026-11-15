@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import * as L from '../src/layout.js';
 import { steer, fall, contain, collide, land, TROT } from '../src/move.js';
 import { createRecorder } from '../src/telemetry.js';
+import { slipChance, slipWords, meltSeconds, makeDice, MAX_SLIPS } from '../src/odds.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 let failed = 0;
@@ -74,6 +75,18 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} 
   for (let i = 0; i < 60; i++) { x += 9 / 60; r.tick(1 / 60, at(x, 1, 9)); }
   check('walking off clears it', !r.stuck);
   check('an error is recorded once however often it repeats', r.error('frame', new Error('boom')) === true && r.error('frame', new Error('boom')) === false && r.report().errors[0].n === 2);
+}
+
+// ---- 4. the odds get kinder with every job, and never trap anyone
+{
+  const counts = [0, 1, 2, 3, 4];
+  check('each job finished makes a slip less likely and a snowball last longer', counts.slice(1).every((c) => slipChance(c) < slipChance(c - 1) && meltSeconds(c) > meltSeconds(c - 1)));
+  check('with four jobs done nothing slips', slipChance(4) === 0 && slipWords(4) === 'never' && slipWords(0) === '3 times in 4');
+  const dice = makeDice(() => 0); // the unluckiest dice there are
+  check('however the dice fall, one animal gets away only so often', dice.wrong(1, 0) && dice.wrong(1, MAX_SLIPS - 1) && !dice.wrong(1, MAX_SLIPS));
+  const fair = makeDice(L.makeRnd(7)); let wrong = 0;
+  for (let i = 0; i < 4000; i++) if (fair.wrong(slipChance(1))) wrong++;
+  check('the dice roll what they say', Math.abs(wrong / 4000 - 0.5) < 0.04, (wrong / 4000).toFixed(3));
 }
 
 console.log(failed ? `\n${failed} check(s) failed` : '\nall node checks passed');

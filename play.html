@@ -19,6 +19,8 @@
   #fill { height:100%; width:0%; background:repeating-linear-gradient(45deg, var(--pink) 0 10px, #ffb9cb 10px 20px); transition:width .7s cubic-bezier(.3,1.5,.5,1); }
   #odds { font-size:13px; font-weight:600; }
   #odds b { font-variant-numeric: tabular-nums; }
+  #luck { font-size:12px; font-weight:700; color:#e2447a; min-height:1.2em; }
+  #luck.pop { animation: pop .6s cubic-bezier(.3,1.6,.5,1); }
   #oddsNote { font-size:11.5px; font-style:italic; opacity:.75; margin-top:2px; min-height:1.2em; }
   #meter.pop { animation: pop .6s cubic-bezier(.3,1.6,.5,1); }
   @keyframes pop { 30% { transform: scale(1.09) rotate(-1.5deg); } }
@@ -59,7 +61,7 @@
     /* narrow screens: meter across the top, the list as a strip of chips under it, messages low down */
     #meter { left:8px; right:8px; top:8px; width:auto; padding:7px 10px; }
     #oddsNote { display:none; }
-    #feats { left:8px; right:8px; top:84px; max-width:none; padding:5px 8px; font-size:10.5px; display:flex; flex-wrap:wrap; gap:1px 10px; }
+    #feats { left:8px; right:8px; top:100px; max-width:none; padding:5px 8px; font-size:10.5px; display:flex; flex-wrap:wrap; gap:1px 10px; }
     #feats li { padding:1px 0; gap:4px; }
     #feats li.secrets { margin:0; padding:1px 0; border:0; font-size:10.5px; }
     #toast { top:auto; bottom:178px; font-size:14px; padding:8px 12px; width:max-content; max-width:92vw; }
@@ -82,6 +84,7 @@
     <div class="label"><span>IMPROBABILITY</span><span id="pct">0%</span></div>
     <div class="bar"><div id="fill"></div></div>
     <div id="odds">Odds of a pig flying: <b id="oddsN">1 in 3,720,000</b></div>
+    <div id="luck"></div>
     <div id="oddsNote"></div>
   </div>
   <a id="back" href="index.html">← launcher</a>
