@@ -38,9 +38,9 @@
   #help { position:absolute; left:14px; bottom:12px; font-size:12px; font-weight:700; color:#fff; text-shadow:0 1px 3px rgba(59,29,58,.8); }
   #timer { position:absolute; right:14px; bottom:12px; font-size:14px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(59,29,58,.8); font-variant-numeric: tabular-nums; }
   #flash { position:fixed; inset:0; background:#fff; opacity:0; pointer-events:none; }
-  .overlay { position:fixed; inset:0; display:grid; place-items:center; background:rgba(59,29,58,.35); backdrop-filter: blur(3px); z-index:5; padding:20px; }
+  .overlay { position:fixed; inset:0; display:grid; overflow-y:auto; background:rgba(59,29,58,.35); backdrop-filter: blur(3px); z-index:5; padding:20px; }
   .overlay.hidden { display:none; }
-  .card { padding:28px 34px; text-align:center; max-width:520px; }
+  .card { margin:auto; padding:28px 34px; text-align:center; max-width:520px; } /* auto margins centre it, and let a short screen scroll to its top */
   .card h1 { font-size:clamp(38px, 8vw, 64px); margin:0 0 6px; line-height:.95; color:#e2447a; text-shadow:3px 3px 0 var(--plum); }
   .card p { font-size:16px; line-height:1.5; margin:10px 0; }
   .card .keys { font-size:13px; opacity:.8; }
@@ -51,6 +51,8 @@
   .btn:disabled { opacity:.6; cursor:progress; box-shadow:2px 2px 0 var(--plum); }
   #flapBtn { display:none; position:fixed; right:22px; bottom:60px; width:96px; height:96px; border-radius:50%; font-size:17px; z-index:3; touch-action:none; }
   #back { position:fixed; left:16px; top:128px; pointer-events:auto; font-size:12px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(59,29,58,.8); text-decoration:none; }
+  #stuckBtn { position:fixed; left:16px; top:150px; pointer-events:auto; cursor:pointer; background:none; border:0; padding:0; font:800 12px inherit; font-family:inherit; color:#fff; opacity:.75; text-shadow:0 1px 3px rgba(59,29,58,.8); z-index:3; }
+  #stuckBtn.on { opacity:1; background:var(--gold); color:var(--plum); text-shadow:none; border:2px solid var(--plum); border-radius:9px; padding:5px 10px; box-shadow:2px 2px 0 var(--plum); }
   #oinkBtn { display:none; position:fixed; right:128px; bottom:60px; width:64px; height:64px; border-radius:50%; font-size:12px; padding:0; z-index:3; touch-action:none; }
   @media (pointer: coarse) { #flapBtn, #oinkBtn { display:block; } #help { display:none; } }
   @media (max-width: 640px) {
@@ -62,6 +64,11 @@
     #feats li.secrets { margin:0; padding:1px 0; border:0; font-size:10.5px; }
     #toast { top:auto; bottom:178px; font-size:14px; padding:8px 12px; width:max-content; max-width:92vw; }
     #back { top:auto; bottom:12px; left:10px; }
+    #stuckBtn { top:auto; bottom:10px; left:104px; }
+    #help { display:none; } /* no room beside the launcher link; the start card lists the keys */
+    .overlay { padding:12px; }
+    .card { padding:18px 16px; }
+    .card p { font-size:14.5px; line-height:1.4; margin:8px 0; }
   }
 </style>
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
@@ -85,6 +92,7 @@
   <div id="timer">0:00</div>
 </div>
 
+<button id="stuckBtn" title="Frees the pig and saves a report of the last ten seconds">stuck?</button>
 <button id="flapBtn" class="btn display">FLAP</button>
 <button id="oinkBtn" class="btn ghost display">OINK</button>
 

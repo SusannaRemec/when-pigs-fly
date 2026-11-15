@@ -170,6 +170,7 @@ And when a check fails after an unrelated change, suspect the check as well as t
 | What happened | Rule |
 |---|---|
 | The game silently failed to load after a new loader imported a file not yet copied in. | After adding any module, load the page and read the console before doing anything else. |
+| The launcher's flying pig vanished when the pig became a Blender model; the launcher still built it the old way and threw on load. Nobody noticed until a phone showed an empty sky. | When a shared module changes, load every page that uses it and read each console. |
 
 **Baking and placement**
 
@@ -186,12 +187,14 @@ And when a check fails after an unrelated change, suspect the check as well as t
 | The camera ended up inside the barn, and inside trees. | A third-person camera needs its own obstacle rules. Test by standing next to things. |
 | A HUD line showed struck through because a toggle was passed `undefined`. | Look at the HUD in screenshots too, not only the 3D view. |
 | The phone layout overlapped badly. | Check a narrow screen before calling any HUD change finished. |
+| The launcher's title ran off a phone screen as one word: its line breaks were hidden and there were no spaces behind them. | Check every page at phone width, not only the game. |
 
 **Testing and sound**
 
 | What happened | Rule |
 |---|---|
 | The play-test reported the barn puzzle broken; the test had stepped on the wrong plate. | When a test fails after an unrelated change, suspect the test as well as the game. |
+| A player got stuck on the hill; 480,000 simulated walks over it could not repeat it. | Build a recorder into the game (`src/telemetry.js`) so a player's own session can say what happened. |
 | A batch of scheduled sounds rendered far too loud; a gain sat at full until its start time. | Measure audio, and start every gain at zero. |
 
 **Publishing**

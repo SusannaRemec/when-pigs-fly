@@ -45,7 +45,7 @@ nav {
 nav a { color: var(--plum); text-decoration: none; }
 nav a:not(.btn):hover { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 4px; }
 nav .logo { font-size: 22px; color: #fff; text-shadow: 2px 2px 0 var(--plum); margin-right: auto; letter-spacing: .04em; }
-.hero-copy { position: relative; z-index: 1; padding: 90px clamp(18px, 5vw, 64px) 70px; max-width: 640px; }
+.hero-copy { position: relative; z-index: 1; padding: 90px clamp(18px, 5vw, 64px) 70px; max-width: min(640px, 100%); }
 .eyebrow { font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 13px; margin: 0 0 22px; }
 h1 {
   font-size: clamp(64px, min(12vw, 17.5vh), 160px); line-height: .9; margin: 0 0 22px; color: #fff;
@@ -130,8 +130,8 @@ footer {
   nav a:not(.btn) { display: none; }
   .hero { align-items: flex-end; }
   .hero-copy { padding-top: 46svh; padding-bottom: 64px; }
-  h1 br { display: none; }
-  h1 { font-size: clamp(52px, 15vw, 90px); line-height: .9; }
+  h1 br { display: none; } /* the words keep a space before each break, so they still wrap */
+  h1 { font-size: clamp(44px, 14vw, 90px); line-height: .9; }
   .odds { margin-top: 20px; }
 }
 @media (prefers-reduced-motion: reduce) {

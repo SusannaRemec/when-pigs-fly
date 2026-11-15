@@ -9,6 +9,12 @@ and get over the blue moon. The island keeps fifteen secrets, and the barn is lo
 Controls: W A S D to move, SPACE to hop and flap, SHIFT to trot, E to oink, V to change view, M to mute.
 On a phone, drag to steer and use the FLAP and OINK buttons.
 
+**Stuck?** The small "stuck?" link (bottom left on a phone) puts the pig back where it was a
+few seconds earlier and saves a report of the last ten seconds: positions, speeds, what it bumped
+into and what the controls were doing. Nothing is sent anywhere. On a phone the share sheet opens
+so you can pass the report on; elsewhere it is copied to the clipboard. The last three reports
+stay in the browser under `wpf-stuck`.
+
 ## Run it locally
 
     npm start        # serves the folder at http://localhost:4173

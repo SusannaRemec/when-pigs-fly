@@ -9,6 +9,7 @@ import { P, SUN_DIR, WATER_Y, groundY, standY, makeRnd, buildColliders, CLOVERS,
 import { loadCritters, pose } from './critters.js';
 import { createPig } from './pig.js';
 import { Sfx } from './audio.js';
+import { createRecorder } from './telemetry.js';
 
 // ---------------------------------------------------------------- setup
 const $ = (id) => document.getElementById(id);
@@ -445,6 +446,7 @@ const WING_NOTES = [
 function complete(key, line) {
   if (feats[key]) return;
   feats[key] = true;
+  tele.note('done', key);
   sfx.feat();
   burst(pos.clone().add(new THREE.Vector3(0, 2, 0)), 0xffc93c, 26, 7, 6);
   resign(key);
@@ -544,6 +546,7 @@ function strike() {
   requestAnimationFrame(() => { $('flash').style.transition = 'opacity .6s'; $('flash').style.opacity = 0; });
   sfx.thunder();
   soot = 1; jolt(1);
+  tele.note('lightning', rod.strikes);
   vy = 9; grounded = false; speed = 0;
   burst(pos.clone().add(new THREE.Vector3(0, 1.5, 0)), 0x444444, 18, 4, 2, 1.6);
 }
@@ -1033,6 +1036,36 @@ const keys = {};
 let flapQueued = false, holdFlap = false;
 const touch = { id: null, ox: 0, oy: 0, turn: 0, fwd: 0 };
 
+// Flight recorder: the last ten seconds of the pig, kept in this browser, for working out how
+// someone got stuck. The "stuck?" button frees the pig and offers the report to share.
+const BUILD = '2026-11-14b';
+const stuckBtn = $('stuckBtn'); // absent if a phone is still holding an older copy of the page
+const tele = createRecorder({
+  build: BUILD,
+  context: () => ({
+    seed, active: active.join(), done: Object.keys(feats).filter((k) => feats[k]).join(), count, finale, won, time: Math.round(time),
+    pig: { x: +pos.x.toFixed(2), y: +pos.y.toFixed(2), z: +pos.z.toFixed(2), yaw: +yaw.toFixed(2), speed: +speed.toFixed(2), vy: +vy.toFixed(2), grounded, ground: +standY(pos.x, pos.z).toFixed(2), inBarn: inBarn(), offshore: +offshore(pos.x, pos.z).toFixed(1) },
+    input: { touch: { ...touch }, keys: Object.keys(keys).filter((k) => keys[k]).join(), holdFlap, firstPerson },
+    screen: { w: innerWidth, h: innerHeight, dpr: devicePixelRatio, slowStep, ua: navigator.userAgent },
+  }),
+  onStuck() { stuckBtn?.classList.add('on'); },
+});
+stuckBtn?.addEventListener('click', (e) => {
+  e.preventDefault();
+  const rep = tele.manual();
+  const to = tele.escape(pos.x, pos.z) || { x: 0, z: 0 };
+  pos.set(to.x, standY(to.x, to.z), to.z); vy = 0; speed = 0; grounded = true;
+  for (const k in keys) keys[k] = false;
+  touch.id = null; touch.turn = 0; touch.fwd = 0; holdFlap = false;
+  tele.clear(); tele.note('freed');
+  stuckBtn.classList.remove('on');
+  const text = JSON.stringify(rep);
+  say('Freed. A report of what happened is saved. Send it to the maker if you like.', 5);
+  // Sharing is the player's choice: the share sheet on a phone, the clipboard elsewhere.
+  if (navigator.share) navigator.share({ title: 'When Pigs Fly: stuck report', text }).catch(() => {});
+  else if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+});
+
 function begin() {
   if (started) return;
   started = true;
@@ -1051,6 +1084,7 @@ function oink() { sfx.oink(); ev.oink = true; if (started) oinkReact(); }
 $('oinkBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); oink(); });
 window.addEventListener('keydown', (e) => {
   if (!started) { if ((e.code === 'Enter' || e.code === 'Space') && !e.repeat) { e.preventDefault(); begin(); } return; }
+  if (!e.repeat) tele.note('key+', e.code);
   keys[e.code] = true;
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) flapQueued = true; holdFlap = true; }
   if (e.code === 'KeyE' && !e.repeat) oink();
@@ -1058,11 +1092,12 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyM' && !e.repeat) say(sfx.toggleMute() ? 'Sound off.' : 'Sound on.', 1.5);
   if (e.code.startsWith('Arrow')) e.preventDefault();
 });
-window.addEventListener('keyup', (e) => { keys[e.code] = false; if (e.code === 'Space') holdFlap = false; });
-window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; holdFlap = false; });
+window.addEventListener('keyup', (e) => { tele.note('key-', e.code); keys[e.code] = false; if (e.code === 'Space') holdFlap = false; });
+window.addEventListener('blur', () => { tele.note('blur'); for (const k in keys) keys[k] = false; holdFlap = false; });
 
 canvas.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'mouse') return;
+  tele.note('touch+', `${e.pointerId}${touch.id === null ? '' : ' ignored, steering with ' + touch.id}`);
   if (touch.id === null) { touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; }
 });
 canvas.addEventListener('pointermove', (e) => {
@@ -1070,7 +1105,7 @@ canvas.addEventListener('pointermove', (e) => {
   touch.turn = clamp((e.clientX - touch.ox) / 55, -1, 1);
   touch.fwd = clamp(-(e.clientY - touch.oy) / 55, -1, 1);
 });
-const endTouch = (e) => { if (e.pointerId === touch.id) { touch.id = null; touch.turn = 0; touch.fwd = 0; } };
+const endTouch = (e) => { tele.note(e.type === 'pointercancel' ? 'touch cancelled' : 'touch-', e.pointerId); if (e.pointerId === touch.id) { touch.id = null; touch.turn = 0; touch.fwd = 0; } };
 canvas.addEventListener('pointerup', endTouch);
 canvas.addEventListener('pointercancel', endTouch);
 const fb = $('flapBtn');
@@ -1137,6 +1172,7 @@ function updatePig(dt) {
     if (c.r !== undefined) {
       const dx = pos.x - c.x, dz = pos.z - c.z, d = Math.hypot(dx, dz), min = c.r + 0.9;
       if (d < min && d > 0.0001) {
+        tele.hit(c.kind);
         // push out, and slip sideways so a head-on bump slides past
         const side = Math.sin(yaw) * dz - Math.cos(yaw) * dx >= 0 ? 1 : -1;
         const slip = Math.abs(speed) * 0.6 * dt * side;
@@ -1146,6 +1182,7 @@ function updatePig(dt) {
     } else {
       const dx = pos.x - c.x, dz = pos.z - c.z, hx = c.hx + 0.9, hz = c.hz + 0.9;
       if (Math.abs(dx) < hx && Math.abs(dz) < hz) {
+        tele.hit(c.kind);
         if (hx - Math.abs(dx) < hz - Math.abs(dz)) pos.x = c.x + Math.sign(dx || 1) * hx;
         else pos.z = c.z + Math.sign(dz || 1) * hz;
       }
@@ -1183,6 +1220,8 @@ function updatePig(dt) {
   const bank = grounded ? 0 : -turn * 0.35;
   pig.group.rotation.z += (bank - pig.group.rotation.z) * Math.min(1, dt * 5);
   pig.update(dt, { speed: Math.abs(speed), airborne: !grounded, t: time });
+  tele.tick(dt, { x: pos.x, y: pos.y, z: pos.z, yaw, speed, vy, grounded, ground: gy, fwd, turn });
+  if (!tele.stuck) stuckBtn?.classList.remove('on');
 }
 
 const nearGround = () => pos.y - standY(pos.x, pos.z) < 2.5;
@@ -1927,6 +1966,6 @@ window.__wpf = {
   teleport(x, y, z) { pos.set(x, y === null ? standY(x, z) : y, z); vy = 0; grounded = y === null; },
   face(a) { yaw = a; },
   view(...v) { debugCam = v.length === 6 ? v : null; },
-  keys, begin, step, groundY,
+  keys, begin, step, groundY, tele, touch,
   press(code, on) { keys[code] = on; if (code === 'Space') { holdFlap = on; if (on) flapQueued = true; } },
 };

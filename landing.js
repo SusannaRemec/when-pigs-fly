@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createPig } from './src/pig.js';
+import { loadCritters } from './src/critters.js';
 
 // ---------- odds counter: nervous at rest, collapses when you reach for Play
 const oddsEl = document.getElementById('odds');
@@ -45,7 +46,8 @@ const sun = new THREE.DirectionalLight(0xfff0d8, 2.4);
 sun.position.set(-6, 10, 8);
 scene.add(sun);
 
-const pig = createPig();
+const pig = createPig(await loadCritters()); // the pig is a Blender model now, so it has to be fetched
+pig.setWingScale(1);
 const rig = new THREE.Group();
 rig.add(pig.group);
 pig.group.position.y = -1.3;
